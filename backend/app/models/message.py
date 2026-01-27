@@ -1,0 +1,40 @@
+"""
+Message model - represents chat messages in a session.
+"""
+
+import uuid
+from datetime import datetime
+from enum import Enum as PyEnum
+
+from sqlalchemy import Column, String, Text, DateTime, Enum, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.db.base import Base
+
+
+class MessageRole(str, PyEnum):
+    """Message author role."""
+    user = "user"
+    assistant = "assistant"
+
+
+class Message(Base):
+    """
+    Message model representing a single message in a reflection session.
+    """
+    __tablename__ = "messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False)
+    role = Column(Enum(MessageRole), nullable=False)
+    content = Column(Text, nullable=False)
+    stage_id = Column(String(50), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # Relationships
+    session = relationship("Session", back_populates="messages")
+    safety_incidents = relationship("SafetyIncident", back_populates="message")
+
+    def __repr__(self):
+        return f"<Message(id={self.id}, role={self.role}, session_id={self.session_id})>"
