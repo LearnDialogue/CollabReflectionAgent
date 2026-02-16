@@ -41,8 +41,10 @@ You MUST respond with ONLY a JSON object in this exact format, no other text:
 
 Rules:
 - "student_text" is what the student sees. Write naturally, as a person.
-- "stage_completed" should be true ONLY when the student has clearly \
-satisfied the completion criteria described below.
+- "stage_completed": set to true when the completion criteria below are met. \
+Do NOT linger in a stage once the student has clearly satisfied the criteria. \
+It is better to advance too early than to bore the student by repeating the \
+same kind of question. When in doubt, advance.
 - "routing_signal" must be "NEXT" when stage_completed is true, and "STAY" \
 when stage_completed is false.
 - "reflection_data" is never shown to the student. Use it to note things \
@@ -60,11 +62,13 @@ STAGE_REGISTRY = {
             "This is the start of the session. Your goal is to warmly greet "
             "the student, learn their name if you don't already know it, and "
             "make them feel comfortable. Ask what they'd like to reflect on today. "
-            "Keep it brief and genuine — one or two sentences is fine."
+            "Keep it brief and genuine — one or two sentences is fine. "
+            "This stage should be SHORT — one or two exchanges at most."
         ),
         "completion_criteria": (
-            "The student has introduced themselves or acknowledged the greeting "
-            "AND mentioned what they want to discuss or reflect on."
+            "The student has responded to your greeting and given any indication "
+            "of what they want to discuss. This is a LOW bar — if they mention "
+            "a project, a lab, or any topic, the greeting is complete."
         ),
         "max_turns": 3,
         "next_stage": "context_gathering",
@@ -217,7 +221,7 @@ def build_system_prompt(
         stage["system_prompt"],
         "",
         f"Completion criteria: {stage['completion_criteria']}",
-        "Only set stage_completed=true when ALL criteria above are clearly met.",
+        "Set stage_completed=true as soon as the criteria are reasonably met. Do not linger.",
     ]
 
     # Personalization

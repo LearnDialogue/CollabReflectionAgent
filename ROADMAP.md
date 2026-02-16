@@ -248,20 +248,20 @@ _build_message_history():
 
 ---
 
-## Step 6 — End-to-End Validation ⬜
+## Step 6 — End-to-End Validation ✅
 
 > Smoke test everything works together.
 
 | # | Task | Status |
 |---|------|--------|
-| 6.1 | `docker compose up --build` succeeds | ⬜ |
-| 6.2 | Login as admin/admin123 | ⬜ |
-| 6.3 | Start a new session | ⬜ |
-| 6.4 | Chat through all 7 stages → responses are LLM-generated, not templates | ⬜ |
-| 6.5 | Session completes gracefully at wrap_up | ⬜ |
-| 6.6 | Query DB: `messages.metadata` has routing_signal + reflection_data | ⬜ |
-| 6.7 | Test fallback: temporarily set invalid API key → app still works (template fallback) | ⬜ |
-| 6.8 | Commit + push | ⬜ |
+| 6.1 | `docker compose up --build` succeeds | ✅ |
+| 6.2 | Login as admin/admin123 | ✅ |
+| 6.3 | Start a new session | ✅ |
+| 6.4 | Chat through all 7 stages → responses are LLM-generated, not templates | ✅ |
+| 6.5 | Session completes gracefully at wrap_up | ✅ |
+| 6.6 | Query DB: `messages.llm_metadata` has routing_signal + reflection_data | ✅ |
+| 6.7 | Test fallback: temporarily set invalid API key → app still works (template fallback) | ✅ |
+| 6.8 | Commit + push | ✅ |
 
 ---
 
