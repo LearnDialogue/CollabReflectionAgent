@@ -4,7 +4,7 @@ A conversational AI agent designed to help robotics students reflect on their le
 
 ---
 
-## 🚀 TL;DR - Run It Now
+## Quick Start
 
 ```bash
 # Clone and start everything
@@ -58,28 +58,26 @@ A chat-based AI agent that:
 
 ## Current Status
 
-This repository contains the **D1 Foundation** - a fully functional skeleton application.
+The core system is fully functional with LLM integration, a dashboard UI, and post-session evaluation.
 
 | Layer | Status | Description |
 |-------|--------|-------------|
-| Infrastructure | ✅ Complete | Docker Compose with PostgreSQL, backend, and frontend |
-| Database | ✅ Complete | All tables created via Alembic migrations |
-| Authentication | ✅ Complete | JWT-based login with role support (STUDENT/ADMIN) |
-| API | ✅ Complete | All CRUD endpoints for sessions, messages, users |
-| Chat UI | ✅ Complete | Functional chat interface with message display |
-| Conversation Logic | ⚠️ Stub | Returns template responses (no LLM integration yet) |
+| Infrastructure | Complete | Docker Compose with PostgreSQL, backend, and frontend |
+| Database | Complete | All tables created via Alembic migrations |
+| Authentication | Complete | JWT-based login with role support |
+| API | Complete | All CRUD endpoints for sessions, messages, users |
+| LLM Integration | Complete | GPT-4o-mini with JSON mode, retry logic, structured responses |
+| Dashboard UI | Complete | Session sidebar, chat, stage progress, metadata display |
+| Post-Session Eval | Complete | Automated scoring, student profiling, recommendations |
+| Safety Monitoring | Planned | Database table exists, detection logic not yet implemented |
 
 **What you can do right now:**
 1. Log in as admin or student
-2. Start a chat session
-3. Send messages and receive (placeholder) responses
-4. View conversation history
-
-**What's coming next (D2):**
-- Real LLM integration (OpenAI/Claude)
-- Intelligent stage progression
-- Safety monitoring
-- Session summaries
+2. Start a chat session and have a real conversation with the AI tutor
+3. Watch the agent progress through 7 reflection stages automatically
+4. View LLM metadata and routing decisions on each message
+5. See a full evaluation when the session completes
+6. Inspect any session with detailed metadata on the inspect page
 
 ---
 
@@ -90,7 +88,7 @@ This repository contains the **D1 Foundation** - a fully functional skeleton app
 │                           FRONTEND                                   │
 │                    (Next.js 14 + TypeScript)                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐  │
-│  │ Login Page  │  │  Chat Page  │  │  AuthContext (JWT storage)  │  │
+│  │ Login Page  │  │  Dashboard  │  │  AuthContext (JWT storage)  │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────────┘  │
 │                            │                                         │
 │                    /api/* proxy                                      │
@@ -102,22 +100,25 @@ This repository contains the **D1 Foundation** - a fully functional skeleton app
 │                    (FastAPI + SQLAlchemy)                           │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                      API Routes                               │   │
-│  │  /auth/*  │  /sessions/*  │  /admin/*  │  /health            │   │
+│  │  /auth/*  │  /sessions/*  │  /stages  │  /admin/*  │ /health │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                            │                                         │
 │                            ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                     FlowEngine                                │   │
-│  │         (Conversation flow & response generation)            │   │
+│  │              FlowEngine + LLM Client + Evaluator              │   │
 │  │                                                               │   │
-│  │   greeting → context → problem → reflection → brainstorm     │   │
-│  │                    → action_plan → wrap_up                    │   │
+│  │  prompts.py ──► flow_engine.py ──► llm_client.py (OpenAI)    │   │
+│  │                        │                                      │   │
+│  │                        ▼                                      │   │
+│  │              session_evaluator.py (post-session)              │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                            │                                         │
 │                            ▼                                         │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                   SQLAlchemy Models                           │   │
 │  │  Student │ Session │ Message │ SessionSummary │ SafetyIncident│   │
+│  │                                                               │   │
+│  │  JSONB columns: messages.llm_metadata, sessions.evaluation_data│   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └────────────────────────────┼────────────────────────────────────────┘
                              │
@@ -214,113 +215,140 @@ open http://localhost:3000
 ```
 AgenticRoboticsEvaluator/
 │
-├── backend/                      # Python FastAPI application
+├── backend/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── deps.py           # Dependency injection (auth, DB session)
+│   │   │   ├── deps.py              # Auth and DB dependency injection
 │   │   │   └── routes/
-│   │   │       ├── auth.py       # Login, get current user
-│   │   │       ├── sessions.py   # Create/list sessions, chat endpoint
-│   │   │       ├── admin.py      # Admin-only user/session management
-│   │   │       └── health.py     # Health check endpoint
+│   │   │       ├── auth.py          # Login, get current user
+│   │   │       ├── sessions.py      # Create sessions, chat endpoint
+│   │   │       ├── stages.py        # Stage registry endpoint
+│   │   │       ├── admin.py         # Admin user/session management
+│   │   │       └── health.py        # Health check
 │   │   │
 │   │   ├── core/
-│   │   │   ├── config.py         # Environment configuration
-│   │   │   └── security.py       # JWT creation/validation, password hashing
+│   │   │   ├── config.py            # Environment configuration
+│   │   │   ├── prompts.py           # All LLM prompts and stage definitions
+│   │   │   └── security.py          # JWT and password hashing
 │   │   │
-│   │   ├── db/
-│   │   │   ├── base.py           # SQLAlchemy declarative base
-│   │   │   └── session.py        # Database session factory
+│   │   ├── models/
+│   │   │   ├── student.py           # User model
+│   │   │   ├── session.py           # Session with evaluation_data JSONB
+│   │   │   ├── message.py           # Message with llm_metadata JSONB
+│   │   │   ├── session_summary.py   # Not yet used
+│   │   │   └── safety_incident.py   # Not yet used
 │   │   │
-│   │   ├── models/               # SQLAlchemy ORM models
-│   │   │   ├── student.py        # User model (students + admins)
-│   │   │   ├── session.py        # Chat session model
-│   │   │   ├── message.py        # Individual message model
-│   │   │   ├── session_summary.py # Structured session extraction (NOT YET USED)
-│   │   │   └── safety_incident.py # Safety flag tracking (NOT YET USED)
-│   │   │
-│   │   ├── schemas/              # Pydantic request/response schemas
-│   │   │   ├── auth.py           # Login request/response
-│   │   │   ├── student.py        # Student CRUD schemas
-│   │   │   ├── session.py        # Session schemas
-│   │   │   └── message.py        # Message and chat schemas
+│   │   ├── schemas/
+│   │   │   ├── auth.py
+│   │   │   ├── student.py
+│   │   │   ├── session.py
+│   │   │   ├── message.py
+│   │   │   └── llm.py               # LLM response validation
 │   │   │
 │   │   ├── services/
-│   │   │   └── flow_engine.py    # Conversation flow logic (see below)
+│   │   │   ├── flow_engine.py       # Stage logic and LLM orchestration
+│   │   │   ├── llm_client.py        # OpenAI API with retry logic
+│   │   │   └── session_evaluator.py # Post-session evaluation
 │   │   │
-│   │   └── main.py               # FastAPI app entry point
+│   │   └── main.py
 │   │
-│   ├── alembic/                  # Database migrations
-│   │   └── versions/
-│   │       └── 001_initial_schema.py
+│   ├── alembic/versions/
+│   │   ├── 001_initial_schema.py
+│   │   ├── 002_add_message_metadata.py
+│   │   └── 003_add_session_evaluation.py
 │   │
-│   ├── tests/                    # Pytest test files
-│   ├── requirements.txt          # Python dependencies
+│   ├── tests/
+│   ├── requirements.txt
 │   ├── Dockerfile
-│   └── seed_admin.py             # Script to create admin user
+│   └── seed_admin.py
 │
-├── frontend/                     # Next.js application
+├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── layout.tsx        # Root layout with AuthProvider
-│   │   │   ├── page.tsx          # Home page (redirects to login/chat)
-│   │   │   ├── login/
-│   │   │   │   └── page.tsx      # Login form
-│   │   │   └── chat/
-│   │   │       └── page.tsx      # Main chat interface
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── login/page.tsx
+│   │   │   ├── chat/page.tsx        # Legacy chat page
+│   │   │   └── dashboard/
+│   │   │       ├── page.tsx         # Main dashboard with chat
+│   │   │       └── [sessionId]/inspect/page.tsx  # Session inspector
+│   │   │
+│   │   ├── components/
+│   │   │   ├── MessageCard.tsx      # Chat bubble with metadata toggle
+│   │   │   ├── MetadataPanel.tsx    # LLM metadata display
+│   │   │   └── StageProgressBar.tsx # Stage progress visualization
 │   │   │
 │   │   └── lib/
-│   │       ├── api.ts            # Axios client with auth interceptor
-│   │       └── auth-context.tsx  # React context for auth state
+│   │       ├── api.ts
+│   │       └── auth-context.tsx
 │   │
 │   ├── package.json
-│   ├── tailwind.config.ts
-│   ├── tsconfig.json
 │   └── Dockerfile
 │
-├── infra/                        # Infrastructure configuration
-│   ├── docker-compose.yml        # Multi-container setup
-│   └── .env.example              # Environment template
+├── infra/
+│   ├── docker-compose.yml
+│   └── .env
 │
-└── docs/                         # Documentation
-    ├── SYSTEM.md                 # Full technical specification
-    ├── SETUP.md                  # Detailed setup guide
-    └── TASKS_D1.md               # Implementation checklist
+└── docs/
+    ├── SYSTEM.md
+    ├── SETUP.md
+    └── TASKS_D1.md
 ```
 
 ---
 
 ## Key Components Explained
 
-### FlowEngine (`backend/app/services/flow_engine.py`)
+### FlowEngine
 
-**FlowEngine is a custom Python class we created** (not a library) that manages the conversation flow. It is the "brain" of the chat system.
+Located in `backend/app/services/flow_engine.py`. This orchestrates each turn of conversation:
 
-**What it does:**
-1. Tracks which **stage** the conversation is in
-2. Decides when to **advance** to the next stage
-3. Generates **responses** (currently templates, will be LLM-generated)
+1. Loads the full conversation history for the session
+2. Builds a system prompt from the Prompt Registry using the current stage config
+3. Calls the LLM client to get a response
+4. Validates the JSON response and extracts the student-facing text
+5. Checks the routing signal and advances to the next stage if needed
 
-**The 7 conversation stages:**
+### Prompt Registry
+
+Located in `backend/app/core/prompts.py`. This is the single source of truth for all LLM instructions. It contains:
+
+- The agent persona and behavioral guidelines
+- The JSON response format the LLM must follow
+- The STAGE_REGISTRY dictionary with all 7 stages
+- The post-session evaluation prompt
+
+Each stage in STAGE_REGISTRY has a goal, system prompt, completion criteria, and max turn count.
+
+### LLM Client
+
+Located in `backend/app/services/llm_client.py`. Wraps OpenAI API calls with:
+
+- JSON mode to ensure structured responses
+- Retry logic with exponential backoff
+- Fallback to echo response if all retries fail
+- LLMResult object with token usage, response time, and attempt count
+
+### Session Evaluator
+
+Located in `backend/app/services/session_evaluator.py`. Runs one LLM call after a session completes to produce:
+
+- Overall quality score with justification
+- Student profile with personal details, communication style, and memory hooks
+- Tutor performance analysis
+- Recommendations for future sessions
+
+### The 7 Conversation Stages
+
 ```
-1. greeting           → Initial rapport building
-2. context_gathering  → Understanding the student's situation
-3. problem_exploration→ Exploring challenges
-4. guided_reflection  → Socratic questioning
-5. solution_brainstorm→ Exploring possible solutions
-6. action_planning    → Concrete next steps
-7. wrap_up            → Summary and closing
+1. greeting            - Build rapport, learn student's name
+2. context_gathering   - Understand what they're working on
+3. problem_exploration - Dig into specific challenges
+4. guided_reflection   - Socratic questioning
+5. solution_brainstorm - Explore solutions without giving answers
+6. action_planning     - Commit to next steps
+7. wrap_up             - Summarize and close
 ```
-
-**Current behavior (D1 stub):**
-- Returns template responses based on current stage
-- Advances stages when user says keywords like "next", "continue", "done"
-- Does NOT call any LLM API yet
-
-**Future behavior (D2):**
-- Will call OpenAI/Claude API for intelligent responses
-- Will detect stage transitions from conversation content
-- Will run safety monitoring in parallel
 
 ### Authentication Flow
 
@@ -336,43 +364,27 @@ AgenticRoboticsEvaluator/
 
 | Model | Table | Purpose | Status |
 |-------|-------|---------|--------|
-| **Student** | `students` | Users (both students and admins) | ✅ Used |
-| **Session** | `sessions` | A chat session with stage tracking | ✅ Used |
-| **Message** | `messages` | Individual chat messages | ✅ Used |
-| **SessionSummary** | `session_summaries` | Structured extraction from sessions | ❌ Not used yet |
-| **SafetyIncident** | `safety_incidents` | Flagged concerning messages | ❌ Not used yet |
+| Student | students | Users, both students and admins | Used |
+| Session | sessions | Chat session with stage tracking and evaluation_data | Used |
+| Message | messages | Individual messages with llm_metadata | Used |
+| SessionSummary | session_summaries | Structured extraction from sessions | Not used yet |
+| SafetyIncident | safety_incidents | Flagged concerning messages | Not used yet |
 
 ---
 
-## What's Working vs. What's Planned
+## What's Next
 
-### ✅ Working Now (D1 Complete)
+These are the logical next steps:
 
-| Feature | Details |
-|---------|---------|
-| User authentication | JWT login, role-based access (STUDENT/ADMIN) |
-| Session management | Create, list, view sessions |
-| Chat functionality | Send messages, receive responses, persist to database |
-| Admin endpoints | CRUD operations for users and sessions |
-| Docker infrastructure | One-command startup with `docker compose up` |
-| Database migrations | Alembic manages schema changes |
+1. **Safety monitoring** - Run a parallel check on each student message to detect concerning content. The database table exists, needs detection logic.
 
-### ⚠️ Partially Implemented (Stubs)
+2. **Session summaries** - Auto-generate a coach-readable summary after each session. The table exists, needs a second post-session LLM call.
 
-| Feature | Current State | What's Missing |
-|---------|---------------|----------------|
-| FlowEngine responses | Template strings | LLM API integration |
-| Stage progression | Keyword-based ("next") | Content-aware detection |
+3. **Cross-session memory** - Use the student profile from evaluation to seed future sessions so the agent remembers the student.
 
-### ❌ Not Yet Implemented (D2/D3)
+4. **Admin dashboard** - Build a proper admin interface for viewing all sessions, reading evaluations, and managing users.
 
-| Feature | Description | Priority |
-|---------|-------------|----------|
-| LLM integration | OpenAI/Claude API calls | D2 - High |
-| Safety monitoring | Detect concerning content, alert admins | D2 - High |
-| Session summaries | Auto-generate structured summaries | D2 - Medium |
-| Admin dashboard UI | Web interface for admin functions | D3 - Medium |
-| Session history UI | Browse past sessions in frontend | D3 - Low |
+5. **Multi-model support** - Add Claude or other providers. The LLM client already accepts a model parameter.
 
 ---
 
