@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 
 from sqlalchemy import Column, String, DateTime, Enum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -34,6 +34,7 @@ class Session(Base):
     model_name = Column(String(100), nullable=False, default="placeholder")
     started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+    evaluation_data = Column(JSONB, nullable=True)
 
     # Relationships
     student = relationship("Student", back_populates="sessions")

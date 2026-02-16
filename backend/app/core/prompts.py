@@ -36,7 +36,13 @@ You MUST respond with ONLY a JSON object in this exact format, no other text:
   "student_text": "<your conversational response to the student>",
   "stage_completed": <true or false>,
   "routing_signal": "<NEXT or STAY>",
-  "reflection_data": {<optional research metadata, or null>}
+  "reflection_data": {
+    "routing_reason": "<1-2 sentence explanation of WHY you chose NEXT or STAY>",
+    "criteria_met": "<which specific completion criteria were satisfied, or what is still missing>",
+    "emotional_tone": "<student's emotional state, e.g. engaged, frustrated, neutral>",
+    "engagement_level": "<low, medium, or high>",
+    "notable_signals": "<any conflict signals, breakthroughs, or other observations, or null>"
+  }
 }
 
 Rules:
@@ -47,9 +53,9 @@ It is better to advance too early than to bore the student by repeating the \
 same kind of question. When in doubt, advance.
 - "routing_signal" must be "NEXT" when stage_completed is true, and "STAY" \
 when stage_completed is false.
-- "reflection_data" is never shown to the student. Use it to note things \
-like emotional tone, conflict signals, or engagement level. Set to null \
-if nothing notable.\
+- "reflection_data" is NEVER shown to the student. It is for researcher \
+auditing only. ALWAYS include "routing_reason" and "criteria_met" — these \
+explain your decision. The other fields are optional but encouraged.\
 """
 
 
@@ -185,6 +191,133 @@ STAGE_ORDER = [
     "action_planning",
     "wrap_up",
 ]
+
+
+# Post-session evaluation prompt
+SESSION_EVALUATION_PROMPT = """\
+You are a senior research analyst evaluating a tutoring session between an AI \
+near-peer tutor and a robotics student. You have access to the COMPLETE \
+conversation transcript and all per-turn metadata (routing decisions, timing, \
+token usage, and the tutor's self-reported reasoning).
+
+Your job is to produce a rigorous, honest evaluation of the session. This is \
+for researchers — be precise, be critical where warranted, and do not \
+sugarcoat. This evaluation will never be shown to the student.
+
+You MUST respond with ONLY a JSON object in this exact format:
+
+{
+  "session_quality": {
+    "overall_score": <1-5 integer>,
+    "justification": "<2-3 sentence explanation of the overall score>",
+    "strengths": ["<strength 1>", "<strength 2>"],
+    "weaknesses": ["<weakness 1>", "<weakness 2>"]
+  },
+  "flow_assessment": {
+    "transitions_appropriate": <true or false>,
+    "transition_notes": "<which transitions were good/bad and why>",
+    "stages_that_felt_rushed": ["<stage_id or empty list>"],
+    "stages_that_dragged": ["<stage_id or empty list>"]
+  },
+  "student_profile": {
+    "name": "<student's first name if mentioned, otherwise null>",
+    "personal_details": ["<any personal facts shared: hometown, year of study, team name, hobbies, pets, living situation, fun anecdotes — anything an agent should remember to feel human>"],
+    "project_context": "<specific details about what the student is building — robot type, sensors used, team role, competition, deadline, etc.>",
+    "technical_background": "<their apparent skill level, languages/tools they mention, prior experience>",
+    "communication_style": "<how they prefer to interact — brief, detailed, emotional, analytical, humorous, reserved, etc.>",
+    "emotional_patterns": "<what triggers frustration, excitement, disengagement — be specific about moments>",
+    "motivations": "<why they care about this project, what drives them — grades, curiosity, career, team loyalty, etc.>",
+    "key_insights": ["<breakthrough or realization the student had during the session>"],
+    "unresolved_topics": ["<things worth revisiting in a future session>"],
+    "memory_hooks": ["<specific phrases, jokes, or references the student used that an agent could call back to in a future session to build rapport>"]
+  },
+  "tutor_performance": {
+    "rapport_quality": "<poor, adequate, good, or excellent>",
+    "questioning_quality": "<did the tutor ask good Socratic questions?>",
+    "missed_opportunities": ["<moment where the tutor could have done better>"],
+    "best_moments": ["<moment where the tutor did particularly well>"]
+  },
+  "engagement_arc": {
+    "summary": "<1-2 sentence description of how engagement changed across the session>",
+    "trajectory": "<rising, falling, steady, or mixed>"
+  },
+  "recommendations": {
+    "for_next_session": ["<what to do differently or follow up on>"],
+    "for_prompt_tuning": ["<specific prompt changes that could improve the experience>"],
+    "for_system_design": ["<any structural/flow improvements worth considering>"]
+  }
+}
+
+Rules:
+- Be specific. Reference actual moments from the conversation.
+- "overall_score": 1=poor, 2=below average, 3=adequate, 4=good, 5=excellent.
+- "student_profile" is critical — this is what we remember for future sessions. \
+Extract EVERY personal detail the student shared, no matter how small. Their name, \
+what robot they are building, their team, a joke they made, a frustration they vented \
+about, their weekend plans — all of it. An agent reading this profile in a future \
+session should feel like they already know this person.
+- "memory_hooks" are particularly valuable: exact quotes, inside jokes, or references \
+that would make the student feel genuinely remembered. Be generous here.
+- If a field has nothing notable, use an empty list [] or "N/A". Never omit a field.
+- Your response must be valid JSON and nothing else.\
+"""
+
+
+def build_evaluation_prompt(
+    messages: list[dict],
+    stage_registry: dict,
+) -> tuple[str, list[dict]]:
+    """
+    Build the system prompt and message payload for post-session evaluation.
+
+    Args:
+        messages: Full conversation history with metadata.
+        stage_registry: The STAGE_REGISTRY config for context.
+
+    Returns:
+        (system_prompt, llm_messages) ready to send to the LLM.
+    """
+    # Build a structured transcript the evaluator can analyze
+    transcript_lines = []
+    for msg in messages:
+        role_label = "STUDENT" if msg["role"] == "user" else "TUTOR"
+        transcript_lines.append(f"[{role_label}] (stage: {msg.get('stage_id', 'unknown')})")
+        transcript_lines.append(msg["content"])
+        if msg.get("llm_metadata"):
+            meta = msg["llm_metadata"]
+            transcript_lines.append(
+                f"  >> metadata: signal={meta.get('routing_signal')}, "
+                f"completed={meta.get('stage_completed')}, "
+                f"forced={meta.get('forced_advance')}, "
+                f"time={meta.get('response_time_ms')}ms, "
+                f"tokens={meta.get('token_usage', {}).get('total', '?')}"
+            )
+            rd = meta.get("reflection_data")
+            if rd and isinstance(rd, dict):
+                transcript_lines.append(
+                    f"  >> reasoning: {rd.get('routing_reason', 'N/A')} | "
+                    f"criteria: {rd.get('criteria_met', 'N/A')} | "
+                    f"tone: {rd.get('emotional_tone', '?')} | "
+                    f"engagement: {rd.get('engagement_level', '?')}"
+                )
+        transcript_lines.append("")
+
+    transcript = "\n".join(transcript_lines)
+
+    # Include the stage config so the evaluator knows the intended flow
+    stage_summary = "\n".join(
+        f"  Stage {cfg['stage_number']}: {sid} — Goal: {cfg['goal']} | "
+        f"Criteria: {cfg['completion_criteria']} | Max turns: {cfg['max_turns']}"
+        for sid, cfg in sorted(stage_registry.items(), key=lambda x: x[1]["stage_number"])
+    )
+
+    user_message = (
+        f"--- STAGE CONFIGURATION ---\n{stage_summary}\n\n"
+        f"--- FULL SESSION TRANSCRIPT WITH METADATA ---\n{transcript}\n\n"
+        f"Evaluate this session. Respond with the JSON evaluation object."
+    )
+
+    return SESSION_EVALUATION_PROMPT, [{"role": "user", "content": user_message}]
 
 
 def build_system_prompt(

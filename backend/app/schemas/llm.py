@@ -58,5 +58,10 @@ class LLMTurnResponse(BaseModel):
     )
     reflection_data: Optional[dict] = Field(
         default=None,
-        description="Optional research metadata. Never shown to the user.",
+        description=(
+            "Researcher-facing metadata. Never shown to the student. "
+            "Expected keys: routing_reason (why NEXT/STAY), criteria_met "
+            "(which criteria satisfied or missing), emotional_tone, "
+            "engagement_level, notable_signals."
+        ),
     )

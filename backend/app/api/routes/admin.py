@@ -12,6 +12,7 @@ from app.models.session import Session as ChatSession
 from app.models.message import Message
 from app.schemas.student import StudentCreate, StudentRead, StudentUpdate
 from app.schemas.session import SessionList, SessionRead
+from app.schemas.message import MessageRead
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -159,14 +160,14 @@ def get_session_admin(
     return session
 
 
-@router.get("/sessions/{session_id}/messages")
+@router.get("/sessions/{session_id}/messages", response_model=list[MessageRead])
 def get_session_messages_admin(
     session_id: UUID,
     db: DBSession,
     admin: AdminUser,
-) -> list[dict]:
+) -> list[Message]:
     """
-    Get all messages for a session (admin only).
+    Get all messages for a session with full metadata (admin only).
     """
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     if not session:
@@ -182,13 +183,4 @@ def get_session_messages_admin(
         .all()
     )
 
-    return [
-        {
-            "id": m.id,
-            "role": m.role.value,
-            "content": m.content,
-            "stage_id": m.stage_id,
-            "created_at": m.created_at.isoformat(),
-        }
-        for m in messages
-    ]
+    return messages

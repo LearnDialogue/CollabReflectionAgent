@@ -10,7 +10,9 @@ To add Anthropic later, implement AnthropicClient with the same interface.
 
 import json
 import logging
-from typing import Protocol, runtime_checkable
+import time
+from dataclasses import dataclass, field
+from typing import Protocol, Optional, runtime_checkable
 
 from openai import AsyncOpenAI
 
@@ -18,6 +20,21 @@ from app.core.config import settings
 from app.schemas.llm import LLMTurnResponse, RoutingSignal
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LLMResult:
+    """
+    Wraps the validated LLM response with telemetry metadata.
+    
+    LLMTurnResponse is the LLM's contract (what it returns).
+    LLMResult adds operational data the LLM doesn't know about:
+    response time, token counts, which attempt succeeded.
+    """
+    response: LLMTurnResponse
+    response_time_ms: int = 0
+    token_usage: dict = field(default_factory=dict)  # {"prompt": N, "completion": N, "total": N}
+    attempt_number: int = 1  # 1 = first try, 2 = repair, 3+ = retries
 
 
 @runtime_checkable
@@ -34,7 +51,7 @@ class LLMClient(Protocol):
         messages: list[dict],
         system_prompt: str,
         stage_id: str,
-    ) -> LLMTurnResponse:
+    ) -> LLMResult:
         """
         Send a conversation to the LLM and get a validated response.
         
@@ -44,7 +61,7 @@ class LLMClient(Protocol):
             stage_id:      Current stage (for logging/fallback)
             
         Returns:
-            Validated LLMTurnResponse.
+            LLMResult containing the validated response + telemetry.
         """
         ...
 
@@ -64,13 +81,18 @@ FALLBACK_RESPONSES = {
 DEFAULT_FALLBACK = "I'm here to help you reflect. Can you tell me more about what's on your mind?"
 
 
-def _build_fallback(stage_id: str) -> LLMTurnResponse:
+def _build_fallback(stage_id: str) -> LLMResult:
     """Build a safe fallback response when the LLM fails entirely."""
-    return LLMTurnResponse(
-        student_text=FALLBACK_RESPONSES.get(stage_id, DEFAULT_FALLBACK),
-        stage_completed=False,
-        routing_signal=RoutingSignal.STAY,
-        reflection_data={"fallback": True, "reason": "llm_failure"},
+    return LLMResult(
+        response=LLMTurnResponse(
+            student_text=FALLBACK_RESPONSES.get(stage_id, DEFAULT_FALLBACK),
+            stage_completed=False,
+            routing_signal=RoutingSignal.STAY,
+            reflection_data={"fallback": True, "reason": "llm_failure"},
+        ),
+        response_time_ms=0,
+        token_usage={},
+        attempt_number=0,  # 0 = fallback, never reached the LLM
     )
 
 
@@ -109,9 +131,9 @@ class OpenAIClient:
         messages: list[dict],
         system_prompt: str,
         stage_id: str,
-    ) -> LLMTurnResponse:
+    ) -> LLMResult:
         """
-        Call OpenAI and return a validated LLMTurnResponse.
+        Call OpenAI and return a validated LLMResult.
         
         Retry strategy:
           1. First attempt with JSON mode
@@ -130,6 +152,8 @@ class OpenAIClient:
 
         # Attempt loop: initial + retries
         last_error = None
+        start_time = time.monotonic()
+
         for attempt in range(1 + self._max_retries):
             try:
                 if attempt > 0:
@@ -159,10 +183,26 @@ class OpenAIClient:
                 # Validate with Pydantic
                 response = LLMTurnResponse(**parsed)
                 
+                elapsed_ms = int((time.monotonic() - start_time) * 1000)
+                
+                # Extract token usage from OpenAI response
+                token_usage = {}
+                if completion.usage:
+                    token_usage = {
+                        "prompt": completion.usage.prompt_tokens,
+                        "completion": completion.usage.completion_tokens,
+                        "total": completion.usage.total_tokens,
+                    }
+                
                 if attempt > 0:
                     logger.info(f"LLM retry succeeded on attempt {attempt + 1}")
                 
-                return response
+                return LLMResult(
+                    response=response,
+                    response_time_ms=elapsed_ms,
+                    token_usage=token_usage,
+                    attempt_number=attempt + 1,
+                )
 
             except json.JSONDecodeError as e:
                 last_error = e

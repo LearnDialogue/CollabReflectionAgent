@@ -1,5 +1,6 @@
 """Session and chat routes for students."""
 
+import logging
 from datetime import datetime
 from uuid import UUID
 
@@ -13,6 +14,9 @@ from app.schemas.session import SessionRead, SessionList
 from app.schemas.message import MessageRead, ChatRequest, ChatResponse
 from app.services.flow_engine import FlowEngine
 from app.services.llm_client import get_llm_client
+from app.services.session_evaluator import evaluate_session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -200,6 +204,37 @@ async def chat(
     db.refresh(user_message)
     db.refresh(assistant_message)
     db.refresh(session)
+
+    # Run post-session evaluation if session just completed
+    if is_complete:
+        try:
+            # Build full message list including the final messages we just saved
+            all_messages = (
+                db.query(Message)
+                .filter(Message.session_id == session_id)
+                .order_by(Message.created_at.asc())
+                .all()
+            )
+            msg_dicts = [
+                {
+                    "role": m.role.value,
+                    "content": m.content,
+                    "stage_id": m.stage_id,
+                    "llm_metadata": m.llm_metadata,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in all_messages
+            ]
+            evaluation = await evaluate_session(msg_dicts)
+            if evaluation:
+                session.evaluation_data = evaluation
+                db.commit()
+                db.refresh(session)
+                logger.info(f"Session {session_id} evaluation saved.")
+            else:
+                logger.warning(f"Session {session_id} evaluation returned None.")
+        except Exception as e:
+            logger.error(f"Post-session evaluation failed for {session_id}: {e}")
 
     return ChatResponse(
         user_message=MessageRead.model_validate(user_message),

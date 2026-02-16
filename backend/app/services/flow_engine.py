@@ -63,11 +63,12 @@ class FlowEngine:
         messages = self._build_message_history(user_input)
 
         # Call the LLM
-        llm_response = await self.llm_client.generate_response(
+        llm_result = await self.llm_client.generate_response(
             messages=messages,
             system_prompt=system_prompt,
             stage_id=self.current_stage,
         )
+        llm_response = llm_result.response
 
         # Check safety valve: force-advance if too many turns in this stage
         stage_turns = self._count_stage_turns()
@@ -104,6 +105,9 @@ class FlowEngine:
             "model": settings.OPENAI_MODEL,
             "prompt_version": "v1",
             "forced_advance": forced_advance,
+            "response_time_ms": llm_result.response_time_ms,
+            "token_usage": llm_result.token_usage,
+            "attempt_number": llm_result.attempt_number,
         }
 
         return llm_response.student_text, new_stage, is_complete, llm_metadata

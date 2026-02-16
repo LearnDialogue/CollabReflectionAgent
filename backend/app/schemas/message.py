@@ -1,6 +1,7 @@
 """Message schemas."""
 
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -25,6 +26,7 @@ class MessageRead(BaseModel):
     role: MessageRole
     content: str
     stage_id: str
+    llm_metadata: Optional[dict] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,6 +1,7 @@
 """Session schemas."""
 
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -25,6 +26,7 @@ class SessionRead(BaseModel):
     model_name: str
     started_at: datetime
     completed_at: datetime | None = None
+    evaluation_data: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
 

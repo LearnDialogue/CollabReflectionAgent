@@ -77,6 +77,32 @@ export const sessionsApi = {
   },
 };
 
+// Stages API
+export const stagesApi = {
+  get: async () => {
+    const response = await api.get("/stages");
+    return response.data;
+  },
+};
+
+// Admin API
+export const adminApi = {
+  listSessions: async (page = 1, pageSize = 50) => {
+    const response = await api.get("/admin/sessions", {
+      params: { page, page_size: pageSize },
+    });
+    return response.data;
+  },
+  getSessionMessages: async (sessionId: string) => {
+    const response = await api.get(`/admin/sessions/${sessionId}/messages`);
+    return response.data;
+  },
+  getSession: async (sessionId: string) => {
+    const response = await api.get(`/admin/sessions/${sessionId}`);
+    return response.data;
+  },
+};
+
 // Health API
 export const healthApi = {
   check: async () => {
