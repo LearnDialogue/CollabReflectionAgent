@@ -200,21 +200,21 @@ This is **never shown to the user**. It's our research audit trail.
 
 ---
 
-## Step 5 — FlowEngine Transplant ⬜
+## Step 5 — FlowEngine Transplant ✅
 
 > The big one: rewire `flow_engine.py` to use real LLM responses.
 
 | # | Task | File(s) | Status |
 |---|------|---------|--------|
-| 5.1 | Remove `STAGES` dict and `_generate_in_stage_response()` | `backend/app/services/flow_engine.py` | ⬜ |
-| 5.2 | Import `LLMClient`, `PromptRegistry`, `LLMTurnResponse` | same | ⬜ |
-| 5.3 | Inject `LLMClient` into FlowEngine constructor | same | ⬜ |
-| 5.4 | Implement `_build_message_history()` (Summary + last N verbatim) | same | ⬜ |
-| 5.5 | Rewrite `process()` to call LLM and interpret response | same | ⬜ |
-| 5.6 | Add max-turns safety valve (force-advance after N turns) | same | ⬜ |
-| 5.7 | Return `metadata` dict from `process()` for the route to save | same | ⬜ |
-| 5.8 | Update `sessions.py` route to pass metadata + save to DB | `backend/app/api/routes/sessions.py` | ⬜ |
-| 5.9 | Keep `STAGE_ORDER` list for reference | `backend/app/services/flow_engine.py` | ⬜ |
+| 5.1 | Remove `STAGES` dict and `_generate_in_stage_response()` | `backend/app/services/flow_engine.py` | ✅ |
+| 5.2 | Import `LLMClient`, `PromptRegistry`, `LLMTurnResponse` | same | ✅ |
+| 5.3 | Inject `LLMClient` into FlowEngine constructor | same | ✅ |
+| 5.4 | Implement `_build_message_history()` (Summary + last N verbatim) | same | ✅ |
+| 5.5 | Rewrite `process()` to call LLM and interpret response | same | ✅ |
+| 5.6 | Add max-turns safety valve (force-advance after N turns) | same | ✅ |
+| 5.7 | Return `metadata` dict from `process()` for the route to save | same | ✅ |
+| 5.8 | Update `sessions.py` route to pass metadata + save to DB | `backend/app/api/routes/sessions.py` | ✅ |
+| 5.9 | Keep `STAGE_ORDER` list for reference | `backend/app/services/flow_engine.py` | ✅ |
 
 ### New `process()` flow
 

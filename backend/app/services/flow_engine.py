@@ -1,85 +1,34 @@
 """
 FlowEngine - Core conversation flow management.
 
-This is a D1 stub that implements basic stage transitions.
-Full LLM integration will be added in D2.
+Orchestrates the conversation by building prompts, calling the LLM client,
+interpreting structured responses, and managing stage transitions.
+The LLM is a functional component — the FlowEngine stays in control.
 """
 
-from typing import TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Optional
+
+from app.core.config import settings
+from app.core.prompts import STAGE_REGISTRY, STAGE_ORDER, build_system_prompt
+from app.schemas.llm import RoutingSignal
 
 if TYPE_CHECKING:
     from app.models.session import Session
     from app.models.message import Message
     from app.models.student import Student
+    from app.services.llm_client import LLMClient
 
-
-# Conversation stages for the reflective agent
-STAGES = {
-    "greeting": {
-        "description": "Initial greeting and rapport building",
-        "next": "context_gathering",
-        "prompts": [
-            "Hello! I'm here to help you reflect on your robotics project. What would you like to discuss today?"
-        ],
-    },
-    "context_gathering": {
-        "description": "Understanding the student's current situation",
-        "next": "problem_exploration",
-        "prompts": [
-            "Can you tell me more about what you're working on?",
-            "What stage are you at with your project?",
-        ],
-    },
-    "problem_exploration": {
-        "description": "Exploring challenges and issues",
-        "next": "guided_reflection",
-        "prompts": [
-            "What challenges are you facing right now?",
-            "What's been the most difficult part?",
-        ],
-    },
-    "guided_reflection": {
-        "description": "Socratic questioning to promote thinking",
-        "next": "solution_brainstorm",
-        "prompts": [
-            "Why do you think that might be happening?",
-            "What have you tried so far?",
-            "What would happen if you approached it differently?",
-        ],
-    },
-    "solution_brainstorm": {
-        "description": "Collaborative solution exploration",
-        "next": "action_planning",
-        "prompts": [
-            "What are some possible approaches you could try?",
-            "Which option feels most promising to you?",
-        ],
-    },
-    "action_planning": {
-        "description": "Concrete next steps",
-        "next": "wrap_up",
-        "prompts": [
-            "What's one thing you could try next?",
-            "How will you know if it's working?",
-        ],
-    },
-    "wrap_up": {
-        "description": "Session summary and closing",
-        "next": None,  # Terminal stage
-        "prompts": [
-            "Great conversation! To summarize what we discussed...",
-            "Is there anything else you'd like to reflect on before we wrap up?",
-        ],
-    },
-}
+logger = logging.getLogger(__name__)
 
 
 class FlowEngine:
     """
     Manages conversation flow through stages.
-    
-    D1 Implementation: Simple keyword-based stage transitions.
-    D2 will add: LLM integration, safety checks, adaptive responses.
+
+    Takes a session, its message history, the student, and an LLM client.
+    process() calls the LLM and returns the response text, new stage,
+    completion flag, and metadata to persist.
     """
 
     def __init__(
@@ -87,97 +36,101 @@ class FlowEngine:
         session: "Session",
         history: list["Message"],
         student: "Student",
+        llm_client: "LLMClient",
     ):
         self.session = session
         self.history = history
         self.student = student
+        self.llm_client = llm_client
         self.current_stage = session.current_stage
 
-    def process(self, user_input: str) -> tuple[str, str, bool]:
+    async def process(self, user_input: str) -> tuple[str, str, bool, Optional[dict]]:
         """
-        Process user input and generate response.
-        
-        Args:
-            user_input: The user's message
-            
+        Process user input and generate an LLM response.
+
         Returns:
-            tuple: (response_content, new_stage, is_complete)
+            (response_text, new_stage, is_complete, llm_metadata)
         """
-        # D1: Simple echo + stage info response
-        # D2: This will call the LLM with proper prompting
-        
-        stage_config = STAGES.get(self.current_stage, STAGES["greeting"])
-        
-        # Check if user wants to move on (simple keyword detection)
-        advance_keywords = ["next", "continue", "move on", "yes", "okay", "done"]
-        should_advance = any(kw in user_input.lower() for kw in advance_keywords)
-        
+        # Build system prompt for current stage
+        system_prompt = build_system_prompt(
+            stage_id=self.current_stage,
+            student_name=self.student.display_name or self.student.username,
+            pronouns=self.student.pronouns,
+            tone_pref=self.student.tone_pref,
+        )
+
+        # Build message history for the LLM
+        messages = self._build_message_history(user_input)
+
+        # Call the LLM
+        llm_response = await self.llm_client.generate_response(
+            messages=messages,
+            system_prompt=system_prompt,
+            stage_id=self.current_stage,
+        )
+
+        # Check safety valve: force-advance if too many turns in this stage
+        stage_turns = self._count_stage_turns()
+        stage_config = STAGE_REGISTRY.get(self.current_stage, {})
+        max_turns = stage_config.get("max_turns", settings.LLM_STAGE_MAX_TURNS)
+        forced_advance = False
+
+        if stage_turns >= max_turns and not llm_response.stage_completed:
+            logger.info(
+                f"Safety valve: forcing advance from '{self.current_stage}' "
+                f"after {stage_turns} turns (max: {max_turns})"
+            )
+            llm_response.stage_completed = True
+            llm_response.routing_signal = RoutingSignal.NEXT
+            forced_advance = True
+
         # Determine new stage
         new_stage = self.current_stage
-        if should_advance and stage_config["next"]:
-            new_stage = stage_config["next"]
-        
-        # Check if session is complete
-        is_complete = new_stage == "wrap_up" and should_advance
-        
-        # Generate response
-        new_stage_config = STAGES.get(new_stage, STAGES["greeting"])
-        
-        if is_complete:
-            response = (
-                f"Thank you for this reflection session, {self._get_name()}! "
-                f"You've made great progress thinking through your project. "
-                f"Good luck with your next steps!"
-            )
-        elif new_stage != self.current_stage:
-            # Stage transition response
-            response = (
-                f"Great, let's move on. "
-                f"{new_stage_config['prompts'][0]}"
-            )
-        else:
-            # Stay in current stage - acknowledge and probe deeper
-            response = self._generate_in_stage_response(user_input, stage_config)
-        
-        return response, new_stage, is_complete
+        if llm_response.stage_completed and llm_response.routing_signal == RoutingSignal.NEXT:
+            next_stage = stage_config.get("next_stage")
+            if next_stage:
+                new_stage = next_stage
 
-    def _get_name(self) -> str:
-        """Get student's preferred name."""
-        return self.student.display_name or self.student.username
+        # Session is complete when wrap_up stage is completed
+        is_complete = (
+            self.current_stage == "wrap_up" and llm_response.stage_completed
+        )
 
-    def _generate_in_stage_response(self, user_input: str, stage_config: dict) -> str:
+        # Build metadata to save alongside the assistant message
+        llm_metadata = {
+            "routing_signal": llm_response.routing_signal.value,
+            "stage_completed": llm_response.stage_completed,
+            "reflection_data": llm_response.reflection_data,
+            "model": settings.OPENAI_MODEL,
+            "prompt_version": "v1",
+            "forced_advance": forced_advance,
+        }
+
+        return llm_response.student_text, new_stage, is_complete, llm_metadata
+
+    def _build_message_history(self, current_input: str) -> list[dict]:
         """
-        Generate a response that stays within the current stage.
-        D1: Simple template response. D2: LLM-generated.
+        Convert DB message history + current user input into the
+        [{role, content}] format the LLM expects.
         """
-        prompts = stage_config["prompts"]
-        
-        # Rotate through prompts based on message count in this stage
-        stage_message_count = sum(
-            1 for m in self.history 
+        messages = []
+        for msg in self.history:
+            messages.append({
+                "role": msg.role.value,
+                "content": msg.content,
+            })
+
+        # Add the current user message (not yet in DB history)
+        messages.append({
+            "role": "user",
+            "content": current_input,
+        })
+
+        return messages
+
+    def _count_stage_turns(self) -> int:
+        """Count how many assistant messages exist in the current stage."""
+        return sum(
+            1 for m in self.history
             if m.stage_id == self.current_stage and m.role.value == "assistant"
         )
-        prompt_idx = stage_message_count % len(prompts)
-        
-        # Build response
-        acknowledgments = [
-            "I hear you.",
-            "That's interesting.",
-            "I understand.",
-            "Thank you for sharing that.",
-        ]
-        ack_idx = len(self.history) % len(acknowledgments)
-        
-        return f"{acknowledgments[ack_idx]} {prompts[prompt_idx]}"
-
-
-# Stage order for reference
-STAGE_ORDER = [
-    "greeting",
-    "context_gathering", 
-    "problem_exploration",
-    "guided_reflection",
-    "solution_brainstorm",
-    "action_planning",
-    "wrap_up",
-]

@@ -12,6 +12,7 @@ from app.models.message import Message, MessageRole
 from app.schemas.session import SessionRead, SessionList
 from app.schemas.message import MessageRead, ChatRequest, ChatResponse
 from app.services.flow_engine import FlowEngine
+from app.services.llm_client import get_llm_client
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -127,7 +128,7 @@ def get_session_messages(
 
 
 @router.post("/{session_id}/chat", response_model=ChatResponse)
-def chat(
+async def chat(
     session_id: UUID,
     request: ChatRequest,
     db: DBSession,
@@ -175,8 +176,9 @@ def chat(
     )
 
     # Process with FlowEngine
-    engine = FlowEngine(session, history, current_user)
-    response_content, new_stage, is_complete = engine.process(request.content)
+    llm_client = get_llm_client()
+    engine = FlowEngine(session, history, current_user, llm_client)
+    response_content, new_stage, is_complete, llm_metadata = await engine.process(request.content)
 
     # Save assistant message
     assistant_message = Message(
@@ -184,6 +186,7 @@ def chat(
         role=MessageRole.assistant,
         content=response_content,
         stage_id=new_stage,
+        llm_metadata=llm_metadata,
     )
     db.add(assistant_message)
 
