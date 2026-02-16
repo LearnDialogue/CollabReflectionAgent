@@ -9,8 +9,7 @@ back a complete instruction string ready to send to the LLM.
 from typing import Optional
 
 
-# ── Agent Persona ───────────────────────────────────────────────
-
+# Agent persona
 SYSTEM_PREAMBLE = """\
 You are a supportive near-peer tutor helping a robotics student reflect on \
 their project experience. You are NOT an authority figure or a professor. \
@@ -29,8 +28,7 @@ most of the talking.
 """
 
 
-# ── JSON Response Format ────────────────────────────────────────
-
+# JSON response format injected into every prompt
 RESPONSE_FORMAT_INSTRUCTION = """\
 You MUST respond with ONLY a JSON object in this exact format, no other text:
 
@@ -53,8 +51,7 @@ if nothing notable.\
 """
 
 
-# ── Stage Registry ──────────────────────────────────────────────
-
+# Stage definitions
 STAGE_REGISTRY = {
     "greeting": {
         "stage_number": 1,
@@ -185,8 +182,6 @@ STAGE_ORDER = [
     "wrap_up",
 ]
 
-
-# ── Prompt Builder ──────────────────────────────────────────────
 
 def build_system_prompt(
     stage_id: str,

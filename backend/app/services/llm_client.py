@@ -1,0 +1,200 @@
+"""
+LLM Client — thin wrapper around OpenAI that returns validated Pydantic objects.
+
+The FlowEngine never talks to the LLM directly. It calls this client,
+which handles API calls, JSON parsing, retries, and fallback.
+
+Provider abstraction: OpenAIClient implements the LLMClient protocol.
+To add Anthropic later, implement AnthropicClient with the same interface.
+"""
+
+import json
+import logging
+from typing import Protocol, runtime_checkable
+
+from openai import AsyncOpenAI
+
+from app.core.config import settings
+from app.schemas.llm import LLMTurnResponse, RoutingSignal
+
+logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class LLMClient(Protocol):
+    """
+    Abstract interface for any LLM provider.
+    
+    The FlowEngine depends on this protocol, not a concrete class.
+    To swap providers, implement this interface and change the factory.
+    """
+
+    async def generate_response(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        stage_id: str,
+    ) -> LLMTurnResponse:
+        """
+        Send a conversation to the LLM and get a validated response.
+        
+        Args:
+            messages:      Chat history as list of {"role": ..., "content": ...}
+            system_prompt: Full system prompt (from build_system_prompt)
+            stage_id:      Current stage (for logging/fallback)
+            
+        Returns:
+            Validated LLMTurnResponse.
+        """
+        ...
+
+
+# Fallback templates (D1 responses, used when LLM is unavailable)
+
+FALLBACK_RESPONSES = {
+    "greeting": "Hey! I'm here to help you reflect on your robotics project. What would you like to talk about today?",
+    "context_gathering": "Can you tell me more about what you're working on right now?",
+    "problem_exploration": "What challenges are you running into?",
+    "guided_reflection": "That's interesting — why do you think that might be happening?",
+    "solution_brainstorm": "What are some approaches you could try?",
+    "action_planning": "What's one concrete step you could take next?",
+    "wrap_up": "Thanks for this conversation! You've done some great thinking today.",
+}
+
+DEFAULT_FALLBACK = "I'm here to help you reflect. Can you tell me more about what's on your mind?"
+
+
+def _build_fallback(stage_id: str) -> LLMTurnResponse:
+    """Build a safe fallback response when the LLM fails entirely."""
+    return LLMTurnResponse(
+        student_text=FALLBACK_RESPONSES.get(stage_id, DEFAULT_FALLBACK),
+        stage_completed=False,
+        routing_signal=RoutingSignal.STAY,
+        reflection_data={"fallback": True, "reason": "llm_failure"},
+    )
+
+
+REPAIR_INSTRUCTION = (
+    "Your previous response was not valid JSON. Please respond with ONLY "
+    "a JSON object in the exact format specified in the system prompt. "
+    "No markdown, no explanation, no code fences — just the raw JSON object."
+)
+
+
+class OpenAIClient:
+    """
+    LLM client backed by OpenAI's chat completion API.
+    
+    Uses JSON mode (response_format: json_object) to encourage
+    structured output, then validates with Pydantic.
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        max_retries: int | None = None,
+    ):
+        self._api_key = settings.OPENAI_API_KEY if api_key is None else api_key
+        self._model = model or settings.OPENAI_MODEL
+        self._max_retries = max_retries if max_retries is not None else settings.LLM_MAX_RETRIES
+        
+        if not self._api_key:
+            logger.warning("OPENAI_API_KEY is not set. LLM calls will use fallback responses.")
+        
+        self._client = AsyncOpenAI(api_key=self._api_key) if self._api_key else None
+
+    async def generate_response(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        stage_id: str,
+    ) -> LLMTurnResponse:
+        """
+        Call OpenAI and return a validated LLMTurnResponse.
+        
+        Retry strategy:
+          1. First attempt with JSON mode
+          2. If JSON parse/validation fails, retry with repair instruction
+          3. If all retries fail, return deterministic fallback
+        """
+        if not self._client:
+            logger.warning("No OpenAI client available, returning fallback.")
+            return _build_fallback(stage_id)
+
+        # Build the full message list: system + conversation history
+        full_messages = [
+            {"role": "system", "content": system_prompt},
+            *messages,
+        ]
+
+        # Attempt loop: initial + retries
+        last_error = None
+        for attempt in range(1 + self._max_retries):
+            try:
+                if attempt > 0:
+                    # Add repair instruction on retry attempts
+                    logger.info(f"LLM retry attempt {attempt} for stage '{stage_id}'")
+                    full_messages.append({
+                        "role": "user",
+                        "content": REPAIR_INSTRUCTION,
+                    })
+
+                # Call OpenAI
+                completion = await self._client.chat.completions.create(
+                    model=self._model,
+                    messages=full_messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.7,
+                    max_tokens=1024,
+                )
+
+                raw_content = completion.choices[0].message.content
+                if not raw_content:
+                    raise ValueError("Empty response from LLM")
+
+                # Parse JSON
+                parsed = json.loads(raw_content)
+                
+                # Validate with Pydantic
+                response = LLMTurnResponse(**parsed)
+                
+                if attempt > 0:
+                    logger.info(f"LLM retry succeeded on attempt {attempt + 1}")
+                
+                return response
+
+            except json.JSONDecodeError as e:
+                last_error = e
+                logger.warning(
+                    f"LLM returned invalid JSON on attempt {attempt + 1}: {e}"
+                )
+            except (ValueError, TypeError) as e:
+                last_error = e
+                logger.warning(
+                    f"LLM response failed validation on attempt {attempt + 1}: {e}"
+                )
+            except Exception as e:
+                last_error = e
+                logger.error(
+                    f"Unexpected error calling LLM on attempt {attempt + 1}: {e}"
+                )
+                # Don't retry on unexpected errors (auth, network, etc.)
+                break
+
+        # All attempts failed — return safe fallback
+        logger.error(
+            f"All LLM attempts failed for stage '{stage_id}'. "
+            f"Last error: {last_error}. Returning fallback."
+        )
+        return _build_fallback(stage_id)
+
+
+def get_llm_client() -> OpenAIClient:
+    """
+    Factory function to create the LLM client.
+    
+    Currently returns OpenAIClient. To switch providers, change this
+    function — nothing else in the codebase needs to change.
+    """
+    return OpenAIClient()

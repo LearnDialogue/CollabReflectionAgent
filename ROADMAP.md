@@ -109,20 +109,20 @@ The system preamble must establish:
 
 ---
 
-## Step 3 — LLM Client ⬜
+## Step 3 — LLM Client ✅
 
 > A thin, testable wrapper around the OpenAI API that returns validated Pydantic objects.
 
 | # | Task | File(s) | Status |
 |---|------|---------|--------|
-| 3.1 | Create `app/services/llm_client.py` | `backend/app/services/llm_client.py` | ⬜ |
-| 3.2 | Define `LLMClient` Protocol (abstract interface) | same | ⬜ |
-| 3.3 | Implement `OpenAIClient(LLMClient)` | same | ⬜ |
-| 3.4 | Implement JSON parsing + Pydantic validation | same | ⬜ |
-| 3.5 | Implement retry logic (bad JSON → repair prompt → retry) | same | ⬜ |
-| 3.6 | Implement fallback (all retries fail → safe template response) | same | ⬜ |
-| 3.7 | Add `get_llm_client()` factory function | same | ⬜ |
-| 3.8 | Write integration test: real API call → valid `LLMTurnResponse` | `backend/tests/test_llm_client.py` | ⬜ |
+| 3.1 | Create `app/services/llm_client.py` | `backend/app/services/llm_client.py` | ✅ |
+| 3.2 | Define `LLMClient` Protocol (abstract interface) | same | ✅ |
+| 3.3 | Implement `OpenAIClient(LLMClient)` | same | ✅ |
+| 3.4 | Implement JSON parsing + Pydantic validation | same | ✅ |
+| 3.5 | Implement retry logic (bad JSON → repair prompt → retry) | same | ✅ |
+| 3.6 | Implement fallback (all retries fail → safe template response) | same | ✅ |
+| 3.7 | Add `get_llm_client()` factory function | same | ✅ |
+| 3.8 | Write integration test: real API call → valid `LLMTurnResponse` | `backend/tests/test_llm_client.py` | ✅ |
 
 ### Call flow
 

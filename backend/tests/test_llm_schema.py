@@ -12,9 +12,6 @@ from pydantic import ValidationError
 from app.schemas.llm import LLMTurnResponse, RoutingSignal
 
 
-# ── Valid payloads ──────────────────────────────────────────────
-
-
 class TestValidPayloads:
     """LLMTurnResponse should parse valid JSON without error."""
 
@@ -80,9 +77,6 @@ class TestValidPayloads:
                 routing_signal=signal,
             )
             assert resp.routing_signal.value == signal
-
-
-# ── Invalid payloads ────────────────────────────────────────────
 
 
 class TestInvalidPayloads:
