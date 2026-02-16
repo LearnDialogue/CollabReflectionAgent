@@ -64,18 +64,18 @@ LLMTurnResponse:
 
 ---
 
-## Step 2 — Prompt Registry ⬜
+## Step 2 — Prompt Registry ✅
 
 > Move all conversational knowledge out of `flow_engine.py` into a single source of truth.
 
 | # | Task | File(s) | Status |
 |---|------|---------|--------|
-| 2.1 | Create `app/core/prompts.py` | `backend/app/core/prompts.py` | ⬜ |
-| 2.2 | Define `SYSTEM_PREAMBLE` — the agent's base persona | same | ⬜ |
-| 2.3 | Define `STAGE_REGISTRY` dict: `stage_id → StageConfig` | same | ⬜ |
-| 2.4 | Define `RESPONSE_FORMAT_INSTRUCTION` — JSON schema instructions appended to every prompt | same | ⬜ |
-| 2.5 | Write `build_system_prompt(stage_id, student_name)` → full system prompt string | same | ⬜ |
-| 2.6 | Review/iterate on prompt text quality | same | ⬜ |
+| 2.1 | Create `app/core/prompts.py` | `backend/app/core/prompts.py` | ✅ |
+| 2.2 | Define `SYSTEM_PREAMBLE` — the agent's base persona | same | ✅ |
+| 2.3 | Define `STAGE_REGISTRY` dict: `stage_id → StageConfig` | same | ✅ |
+| 2.4 | Define `RESPONSE_FORMAT_INSTRUCTION` — JSON schema instructions appended to every prompt | same | ✅ |
+| 2.5 | Write `build_system_prompt(stage_id, student_name)` → full system prompt string | same | ✅ |
+| 2.6 | Review/iterate on prompt text quality | same | ✅ |
 
 ### STAGE_REGISTRY shape (per stage)
 
