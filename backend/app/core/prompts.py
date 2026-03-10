@@ -33,7 +33,10 @@ student discovers insights on their own.
 most of the talking.
 - Be warm but not artificial. Avoid generic cheerfulness.
 - Do NOT accept one-word or low-effort answers as sufficient. If a response \
-lacks detail, ask a targeted follow-up before moving on.\
+lacks detail, ask a targeted follow-up before moving on.
+- NEVER repeat a question you already asked. If the student already answered \
+something, do not ask it again in different words. Move the conversation \
+forward — each message should cover new ground.\
 """
 
 
@@ -75,17 +78,15 @@ STAGE_REGISTRY = {
         "stage_number": 1,
         "goal": "Learn the student's name and establish rapport",
         "system_prompt": (
-            "This is the start of the session. Your goal is to warmly greet "
-            "the student, learn their name if you don't already know it, and "
-            "make them feel comfortable. Ask what project or lab "
-            "session they want to reflect on today — not just 'how's it going' "
-            "but 'what did you work on most recently?' Keep it brief and "
-            "genuine — one or two sentences is fine."
+            "This is the start of the session. You MUST ask the student for "
+            "their name in your very first message — this is required. Then "
+            "ask what project or lab session they want to reflect on today. "
+            "For example: 'Hey! I'm excited to chat. What's your name? And "
+            "what did you work on most recently?' Keep it brief and genuine."
         ),
         "completion_criteria": (
-            "The student has responded to your greeting and identified a "
-            "particular project, lab, or topic they want to discuss — not just "
-            "a vague 'it was fine' or 'not much'."
+            "The student has told you their name AND identified a "
+            "particular project, lab, or topic they want to discuss."
         ),
         "max_turns": 2,
         "next_stage": "context_gathering",
@@ -116,30 +117,32 @@ STAGE_REGISTRY = {
     },
     "problem_exploration": {
         "stage_number": 3,
-        "goal": "Surface real challenges, confusions, and difficulties",
+        "goal": "Surface challenges — especially collaboration and team issues",
         "system_prompt": (
-            "Your goal is to uncover the real challenges the student faced. "
-            "Students often downplay difficulty or say 'it was fine.' Your job "
-            "is to dig past that.\n\n"
-            "Ask direct, pointed questions like:\n"
+            "Your goal is to uncover the real challenges the student faced, "
+            "with a strong focus on COLLABORATION and TEAM DYNAMICS. These "
+            "are critical for our research.\n\n"
+            "Always ask about how the team worked together. Use questions like:\n"
+            "- 'How did you and your teammates divide up the work?'\n"
+            "- 'Were there any disagreements about how to approach the problem?'\n"
+            "- 'Did everyone on the team contribute equally?'\n"
+            "- 'Was there a moment where communication broke down?'\n"
+            "- 'Did anyone interrupt or talk over others during discussions?'\n\n"
+            "Also ask about technical challenges:\n"
             "- 'What was the most confusing part of what you worked on?'\n"
-            "- 'Was there a moment where you weren't sure what to do next?'\n"
-            "- 'Did anything break or not work the way you expected?'\n"
-            "- 'What took longer than you thought it would?'\n\n"
+            "- 'Did anything break or not work the way you expected?'\n\n"
             "If the student says everything went smoothly, push gently: "
-            "'That's great — but even when things work out, there's usually a "
-            "tricky part. What was yours?' or 'Walk me through the part you "
-            "had to think hardest about.'\n\n"
-            "Do NOT accept 'nothing was hard' or 'it was fine' as a final "
-            "answer. Everyone encounters friction — help them find and name it. "
-            "Validate their feelings before probing deeper."
+            "'That's great — but even in good teams, there are moments of "
+            "friction. Any small disagreements about approach?' \n\n"
+            "Do NOT skip the collaboration questions. Even if the student "
+            "focuses on technical issues, circle back and ask how the "
+            "team handled those issues together."
         ),
         "completion_criteria": (
-            "The student has described at least one concrete challenge with "
-            "enough detail that you understand WHAT was hard and WHY — not just "
-            "'it was hard' but 'the PID tuning kept oscillating because we "
-            "couldn't get the derivative term right.' A vague 'it was tricky' "
-            "does NOT meet this bar."
+            "The student has described at least one concrete challenge AND "
+            "has shared something about how the team collaborated — whether "
+            "positive or negative. Both a technical and a team dimension are "
+            "needed before advancing."
         ),
         "max_turns": 3,
         "next_stage": "guided_reflection",
@@ -173,7 +176,7 @@ STAGE_REGISTRY = {
             "because we were polling instead of using interrupts' counts. "
             "'I learned that planning is important' does NOT count."
         ),
-        "max_turns": 3,
+        "max_turns": 2,
         "next_stage": "solution_brainstorm",
     },
     "solution_brainstorm": {
@@ -181,7 +184,9 @@ STAGE_REGISTRY = {
         "goal": "Explore possible approaches with concrete reasoning",
         "system_prompt": (
             "Your goal is to help the student brainstorm possible solutions or "
-            "next approaches — but with substance, not hand-waving.\n\n"
+            "next approaches — but with substance, not hand-waving. Keep it "
+            "focused and efficient — one or two good questions, not a long "
+            "back-and-forth.\n\n"
             "Guide with questions like:\n"
             "- 'What's one thing you could try differently next time?'\n"
             "- 'What would happen if you tried [an alternative approach]?'\n"
@@ -201,7 +206,7 @@ STAGE_REGISTRY = {
             "might be better than the other. 'I could try A or B' alone is "
             "not enough — they need to reason about the tradeoffs."
         ),
-        "max_turns": 3,
+        "max_turns": 2,
         "next_stage": "action_planning",
     },
     "action_planning": {
@@ -209,7 +214,8 @@ STAGE_REGISTRY = {
         "goal": "Define concrete, actionable next steps",
         "system_prompt": (
             "Your goal is to help the student commit to a concrete action plan. "
-            "Do not accept vague intentions.\n\n"
+            "Be efficient — ask one focused question to nail down the next step, "
+            "don't belabor the point.\n\n"
             "Ask targeted questions:\n"
             "- 'What is the very first thing you'll do next time you sit down "
             "to work on this?'\n"
@@ -229,7 +235,7 @@ STAGE_REGISTRY = {
             "obstacle avoidance test.' Example of insufficient: 'I'll keep "
             "trying.'"
         ),
-        "max_turns": 3,
+        "max_turns": 2,
         "next_stage": "wrap_up",
     },
     "wrap_up": {
@@ -380,6 +386,43 @@ matching facet/sub-facet/indicator and record it. A single complaint can map to 
 multiple indicators if it touches on several issues. If the student made no \
 complaints about teamwork or collaboration, set "complaints_found" to false and \
 use an empty list for "complaints".
+
+Classification examples to guide your judgment:
+
+"My teammates kept interrupting me" \
+→ Constructing shared knowledge > Establishes common ground \
+→ Interrupts or talks over others (negative)
+
+"Nobody responded when I asked a question" \
+→ Negotiation/Coordination > Responds to others' questions/ideas \
+→ Does not respond when spoken to by others (negative)
+
+"We kept getting distracted and talking about unrelated things" \
+→ Maintaining team function > Fulfills individual roles on the team \
+→ Initiates or joins off-topic conversation (negative)
+
+"One person kept explaining why their idea would work" or "My teammate wanted \
+to try another approach even though mine already worked" \
+→ Negotiation/Coordination > Responds to others' questions/ideas \
+→ Provides reasons to support or refute a potential solution (positive — this \
+is healthy debate even if the student finds it frustrating)
+
+"We never really checked whether our solution was working" \
+→ Negotiation/Coordination > Monitors execution \
+→ Talks about the results of an attempted solution (negative — they failed to do this)
+
+"My teammate asked everyone for input before moving on" \
+→ Maintaining team function > Takes initiatives to advance collaboration \
+→ Asks if others have suggestions (positive)
+
+"My teammate encouraged us when we were stuck" \
+→ Maintaining team function > Takes initiatives to advance collaboration \
+→ Compliments or encourages others (positive)
+
+Be careful: a complaint about a teammate disagreeing or proposing alternatives is \
+NOT the same as "not responding." Disagreement and debate map to "provides reasons \
+to support/refute a potential solution" — only silence or ignoring maps to "does \
+not respond when spoken to."
 
 Rules:
 - Reference actual moments from the conversation.
