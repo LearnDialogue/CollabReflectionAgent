@@ -37,8 +37,8 @@ async def evaluate_session(
     Returns:
         Parsed evaluation JSON dict, or None if the call fails.
     """
-    if not settings.OPENAI_API_KEY:
-        logger.warning("No API key — skipping session evaluation.")
+    if not settings.OPENAI_API_KEY and not settings.OPENAI_BASE_URL:
+        logger.warning("No API key/base URL — skipping session evaluation.")
         return None
 
     # Build the evaluation prompt with full transcript + metadata
@@ -49,23 +49,34 @@ async def evaluate_session(
 
     # Use a fresh client — could use a different/stronger model
     from openai import AsyncOpenAI
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    base_url = settings.OPENAI_BASE_URL or None
+    effective_api_key = settings.OPENAI_API_KEY or ("ollama" if base_url else "")
+    if not effective_api_key:
+        logger.warning("No effective API key — skipping session evaluation.")
+        return None
+
+    # Some OpenAI-compatible servers (e.g., Ollama) may not support response_format.
+    supports_response_format = not (base_url and ("11434" in base_url or "ollama" in base_url.lower()))
+    client = AsyncOpenAI(api_key=effective_api_key, base_url=base_url)
     eval_model = model or settings.OPENAI_MODEL
 
     logger.info(f"Running post-session evaluation with {eval_model}")
     start_time = time.monotonic()
 
     try:
-        completion = await client.chat.completions.create(
-            model=eval_model,
-            messages=[
+        create_kwargs = {
+            "model": eval_model,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 *llm_messages,
             ],
-            response_format={"type": "json_object"},
-            temperature=0.3,  # Lower temp for analytical precision
-            max_tokens=2048,  # Evaluation needs more room
-        )
+            "temperature": 0.3,  # Lower temp for analytical precision
+            "max_tokens": 2048,  # Evaluation needs more room
+        }
+        if supports_response_format:
+            create_kwargs["response_format"] = {"type": "json_object"}
+
+        completion = await client.chat.completions.create(**create_kwargs)
 
         raw_content = completion.choices[0].message.content
         if not raw_content:

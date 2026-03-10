@@ -15,6 +15,7 @@ from app.schemas.message import MessageRead, ChatRequest, ChatResponse
 from app.services.flow_engine import FlowEngine
 from app.services.llm_client import get_llm_client
 from app.services.session_evaluator import evaluate_session
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def create_session(
         status=SessionStatus.ACTIVE,
         current_stage="greeting",
         prompt_version="v1.0",
-        model_name="gpt-4o-mini",
+        model_name=settings.OPENAI_MODEL,
     )
     db.add(session)
     db.commit()

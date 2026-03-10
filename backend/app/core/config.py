@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     
     # OpenAI
     OPENAI_API_KEY: str = ""
+    # Optional override for OpenAI-compatible endpoints (e.g. Ollama)
+    # Examples:
+    # - http://127.0.0.1:11434/v1
+    # - http://host.docker.internal:11434/v1 (from inside Docker on macOS)
+    OPENAI_BASE_URL: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     
     # LLM Behaviour

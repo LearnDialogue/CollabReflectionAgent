@@ -22,6 +22,14 @@ from app.schemas.llm import LLMTurnResponse, RoutingSignal
 logger = logging.getLogger(__name__)
 
 
+def _is_likely_ollama_base_url(base_url: str | None) -> bool:
+    """Heuristic to detect Ollama/OpenAI-compat servers that may not support response_format."""
+    if not base_url:
+        return False
+    normalized = base_url.lower()
+    return "11434" in normalized or "ollama" in normalized
+
+
 @dataclass
 class LLMResult:
     """
@@ -114,17 +122,35 @@ class OpenAIClient:
     def __init__(
         self,
         api_key: str | None = None,
+        base_url: str | None = None,
         model: str | None = None,
         max_retries: int | None = None,
     ):
         self._api_key = settings.OPENAI_API_KEY if api_key is None else api_key
+        self._base_url = (settings.OPENAI_BASE_URL if base_url is None else base_url) or None
         self._model = model or settings.OPENAI_MODEL
         self._max_retries = max_retries if max_retries is not None else settings.LLM_MAX_RETRIES
+
+        # Some OpenAI-compatible servers (notably Ollama) may not support OpenAI's JSON mode.
+        self._supports_response_format = not _is_likely_ollama_base_url(self._base_url)
         
-        if not self._api_key:
+        if not self._api_key and not self._base_url:
             logger.warning("OPENAI_API_KEY is not set. LLM calls will use fallback responses.")
-        
-        self._client = AsyncOpenAI(api_key=self._api_key) if self._api_key else None
+
+        # For OpenAI-compatible local servers, a dummy key is typically fine.
+        effective_api_key = self._api_key or ("ollama" if self._base_url else "")
+        # Use a 45s timeout so local Ollama doesn't hang forever on slow hardware.
+        import httpx
+        _timeout = httpx.Timeout(connect=5, read=45, write=10, pool=5)
+        self._client = (
+            AsyncOpenAI(
+                api_key=effective_api_key,
+                base_url=self._base_url,
+                http_client=httpx.AsyncClient(timeout=_timeout),
+            )
+            if effective_api_key
+            else None
+        )
 
     async def generate_response(
         self,
@@ -165,12 +191,19 @@ class OpenAIClient:
                     })
 
                 # Call OpenAI
+                create_kwargs = {
+                    "model": self._model,
+                    "messages": full_messages,
+                    "temperature": 0.2,
+                    "max_tokens": 400,
+                }
+
+                # OpenAI JSON mode (response_format) is great when supported.
+                if self._supports_response_format:
+                    create_kwargs["response_format"] = {"type": "json_object"}
+
                 completion = await self._client.chat.completions.create(
-                    model=self._model,
-                    messages=full_messages,
-                    response_format={"type": "json_object"},
-                    temperature=0.7,
-                    max_tokens=1024,
+                    **create_kwargs,
                 )
 
                 raw_content = completion.choices[0].message.content
