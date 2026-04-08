@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: evaluator-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-evaluator}
+      POSTGRES_USER: ${POSTGRES_USER:-evaluator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evaluator_dev}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evaluator}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - evaluator-network
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: evaluator-backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evaluator}:${POSTGRES_PASSWORD:-evaluator_dev}@postgres:5432/${POSTGRES_DB:-evaluator}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.ai.it.ufl.edu/v1/}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.3-70b-instruct}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - evaluator-network
+    command: >
+      sh -c "alembic upgrade head && python seed_admin.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: evaluator-frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - evaluator-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  evaluator-network:
+    driver: bridge
