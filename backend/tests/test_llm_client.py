@@ -2,7 +2,7 @@
 Tests for LLM Client (app/services/llm_client.py).
 
 Includes both unit tests (no API calls) and an integration test
-(real API call, skipped if OPENAI_API_KEY has no quota).
+(real API call, skipped if LLM_API_KEY is not set).
 """
 
 import json
@@ -10,7 +10,7 @@ import pytest
 import asyncio
 
 from app.services.llm_client import (
-    OpenAIClient,
+    NavigatorClient,
     get_llm_client,
     LLMClient,
     _build_fallback,
@@ -48,22 +48,22 @@ class TestFallback:
 class TestClientInit:
     """Client initializes correctly with various configurations."""
 
-    def test_factory_returns_openai_client(self):
+    def test_factory_returns_navigator_client(self):
         client = get_llm_client()
-        assert isinstance(client, OpenAIClient)
+        assert isinstance(client, NavigatorClient)
         assert isinstance(client, LLMClient)
 
     def test_client_with_no_key_has_no_usable_key(self):
         """Client without API key should still instantiate (uses fallback on calls)."""
-        client = OpenAIClient(api_key="")
+        client = NavigatorClient(api_key="")
         assert client._api_key == ""
 
     def test_client_custom_model(self):
-        client = OpenAIClient(api_key="test", model="gpt-4o")
+        client = NavigatorClient(api_key="test", model="gpt-4o")
         assert client._model == "gpt-4o"
 
     def test_client_custom_retries(self):
-        client = OpenAIClient(api_key="test", max_retries=5)
+        client = NavigatorClient(api_key="test", max_retries=5)
         assert client._max_retries == 5
 
 
@@ -71,7 +71,7 @@ class TestNoKeyFallback:
     """When there's no API key, the client returns fallback without crashing."""
 
     def test_no_key_returns_fallback(self):
-        client = OpenAIClient(api_key="")
+        client = NavigatorClient(api_key="")
         system_prompt = build_system_prompt("greeting", student_name="Test")
         messages = [{"role": "user", "content": "Hello"}]
 
@@ -85,15 +85,15 @@ class TestNoKeyFallback:
 
 class TestLiveAPICall:
     """
-    Tests that hit the real OpenAI API.
-    Skipped automatically if the key has no quota.
+    Tests that hit the real LLM API.
+    Skipped automatically if the key is not set.
     """
 
     def test_real_api_greeting(self):
         """Send a real message and get a structured response back."""
         client = get_llm_client()
         if not client._api_key:
-            pytest.skip("No OPENAI_API_KEY set")
+            pytest.skip("No LLM_API_KEY set")
 
         system_prompt = build_system_prompt("greeting", student_name="Aman")
         messages = [

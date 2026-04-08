@@ -66,7 +66,7 @@ The core system is fully functional with LLM integration, a dashboard UI, and po
 | Database | Complete | All tables created via Alembic migrations |
 | Authentication | Complete | JWT-based login with role support |
 | API | Complete | All CRUD endpoints for sessions, messages, users |
-| LLM Integration | Complete | GPT-4o-mini with JSON mode, retry logic, structured responses |
+| LLM Integration | Complete | Llama 3.3 70B via UF Navigator, JSON mode, retry logic, structured responses |
 | Dashboard UI | Complete | Session sidebar, chat, stage progress, metadata display |
 | Post-Session Eval | Complete | Automated scoring, student profiling, recommendations |
 | Safety Monitoring | Planned | Database table exists, detection logic not yet implemented |
@@ -107,7 +107,7 @@ The core system is fully functional with LLM integration, a dashboard UI, and po
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │              FlowEngine + LLM Client + Evaluator              │   │
 │  │                                                               │   │
-│  │  prompts.py ──► flow_engine.py ──► llm_client.py (OpenAI)    │   │
+│  │  prompts.py ──► flow_engine.py ──► llm_client.py (Navigator) │   │
 │  │                        │                                      │   │
 │  │                        ▼                                      │   │
 │  │              session_evaluator.py (post-session)              │   │
@@ -247,7 +247,7 @@ AgenticRoboticsEvaluator/
 │   │   │
 │   │   ├── services/
 │   │   │   ├── flow_engine.py       # Stage logic and LLM orchestration
-│   │   │   ├── llm_client.py        # OpenAI API with retry logic
+│   │   │   ├── llm_client.py        # LLM client (UF Navigator / any OpenAI-compatible API)
 │   │   │   └── session_evaluator.py # Post-session evaluation
 │   │   │
 │   │   └── main.py
@@ -322,7 +322,7 @@ Each stage in STAGE_REGISTRY has a goal, system prompt, completion criteria, and
 
 ### LLM Client
 
-Located in `backend/app/services/llm_client.py`. Wraps OpenAI API calls with:
+Located in `backend/app/services/llm_client.py`. Wraps LLM API calls (via UF Navigator) with:
 
 - JSON mode to ensure structured responses
 - Retry logic with exponential backoff

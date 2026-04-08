@@ -1,18 +1,19 @@
 """
-LLM Client — thin wrapper around OpenAI that returns validated Pydantic objects.
+LLM Client — thin wrapper around any OpenAI-compatible API
+that returns validated Pydantic objects.
 
 The FlowEngine never talks to the LLM directly. It calls this client,
 which handles API calls, JSON parsing, retries, and fallback.
 
-Provider abstraction: OpenAIClient implements the LLMClient protocol.
-To add Anthropic later, implement AnthropicClient with the same interface.
+Works with any OpenAI-compatible endpoint: UF Navigator (LiteLLM),
+OpenAI, or any other proxy that implements the chat completions API.
 """
 
 import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Protocol, Optional, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from openai import AsyncOpenAI
 
@@ -22,19 +23,11 @@ from app.schemas.llm import LLMTurnResponse, RoutingSignal
 logger = logging.getLogger(__name__)
 
 
-def _is_likely_ollama_base_url(base_url: str | None) -> bool:
-    """Heuristic to detect Ollama/OpenAI-compat servers that may not support response_format."""
-    if not base_url:
-        return False
-    normalized = base_url.lower()
-    return "11434" in normalized or "ollama" in normalized
-
-
 @dataclass
 class LLMResult:
     """
     Wraps the validated LLM response with telemetry metadata.
-    
+
     LLMTurnResponse is the LLM's contract (what it returns).
     LLMResult adds operational data the LLM doesn't know about:
     response time, token counts, which attempt succeeded.
@@ -49,7 +42,7 @@ class LLMResult:
 class LLMClient(Protocol):
     """
     Abstract interface for any LLM provider.
-    
+
     The FlowEngine depends on this protocol, not a concrete class.
     To swap providers, implement this interface and change the factory.
     """
@@ -62,12 +55,12 @@ class LLMClient(Protocol):
     ) -> LLMResult:
         """
         Send a conversation to the LLM and get a validated response.
-        
+
         Args:
             messages:      Chat history as list of {"role": ..., "content": ...}
             system_prompt: Full system prompt (from build_system_prompt)
             stage_id:      Current stage (for logging/fallback)
-            
+
         Returns:
             LLMResult containing the validated response + telemetry.
         """
@@ -111,12 +104,13 @@ REPAIR_INSTRUCTION = (
 )
 
 
-class OpenAIClient:
+class NavigatorClient:
     """
-    LLM client backed by OpenAI's chat completion API.
-    
-    Uses JSON mode (response_format: json_object) to encourage
-    structured output, then validates with Pydantic.
+    LLM client for any OpenAI-compatible API (UF Navigator, OpenAI, etc.).
+
+    Uses the OpenAI Python SDK pointed at the configured base URL.
+    JSON mode is attempted first; if the endpoint doesn't support it,
+    falls back to prompt engineering + markdown fence stripping.
     """
 
     def __init__(
@@ -126,31 +120,18 @@ class OpenAIClient:
         model: str | None = None,
         max_retries: int | None = None,
     ):
-        self._api_key = settings.OPENAI_API_KEY if api_key is None else api_key
-        self._base_url = (settings.OPENAI_BASE_URL if base_url is None else base_url) or None
-        self._model = model or settings.OPENAI_MODEL
+        self._api_key = api_key or settings.LLM_API_KEY
+        self._base_url = base_url or settings.LLM_BASE_URL
+        self._model = model or settings.LLM_MODEL
         self._max_retries = max_retries if max_retries is not None else settings.LLM_MAX_RETRIES
 
-        # Some OpenAI-compatible servers (notably Ollama) may not support OpenAI's JSON mode.
-        self._supports_response_format = not _is_likely_ollama_base_url(self._base_url)
-        
-        if not self._api_key and not self._base_url:
-            logger.warning("OPENAI_API_KEY is not set. LLM calls will use fallback responses.")
+        if not self._api_key:
+            logger.warning("LLM_API_KEY is not set. LLM calls will use fallback responses.")
 
-        # For OpenAI-compatible local servers, a dummy key is typically fine.
-        effective_api_key = self._api_key or ("ollama" if self._base_url else "")
-        # Use a 45s timeout so local Ollama doesn't hang forever on slow hardware.
-        import httpx
-        _timeout = httpx.Timeout(connect=5, read=45, write=10, pool=5)
-        self._client = (
-            AsyncOpenAI(
-                api_key=effective_api_key,
-                base_url=self._base_url,
-                http_client=httpx.AsyncClient(timeout=_timeout),
-            )
-            if effective_api_key
-            else None
-        )
+        self._client = AsyncOpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+        ) if self._api_key else None
 
     async def generate_response(
         self,
@@ -159,15 +140,15 @@ class OpenAIClient:
         stage_id: str,
     ) -> LLMResult:
         """
-        Call OpenAI and return a validated LLMResult.
-        
+        Call the LLM and return a validated LLMResult.
+
         Retry strategy:
           1. First attempt with JSON mode
           2. If JSON parse/validation fails, retry with repair instruction
           3. If all retries fail, return deterministic fallback
         """
         if not self._client:
-            logger.warning("No OpenAI client available, returning fallback.")
+            logger.warning("No LLM client available, returning fallback.")
             return _build_fallback(stage_id)
 
         # Build the full message list: system + conversation history
@@ -190,35 +171,40 @@ class OpenAIClient:
                         "content": REPAIR_INSTRUCTION,
                     })
 
-                # Call OpenAI
-                create_kwargs = {
-                    "model": self._model,
-                    "messages": full_messages,
-                    "temperature": 0.2,
-                    "max_tokens": 400,
-                }
-
-                # OpenAI JSON mode (response_format) is great when supported.
-                if self._supports_response_format:
-                    create_kwargs["response_format"] = {"type": "json_object"}
-
-                completion = await self._client.chat.completions.create(
-                    **create_kwargs,
-                )
+                # Try JSON mode first; fall back to plain if unsupported
+                try:
+                    completion = await self._client.chat.completions.create(
+                        model=self._model,
+                        messages=full_messages,
+                        response_format={"type": "json_object"},
+                        temperature=0.7,
+                        max_tokens=1024,
+                    )
+                except Exception:
+                    completion = await self._client.chat.completions.create(
+                        model=self._model,
+                        messages=full_messages,
+                        temperature=0.7,
+                        max_tokens=1024,
+                    )
 
                 raw_content = completion.choices[0].message.content
                 if not raw_content:
                     raise ValueError("Empty response from LLM")
 
-                # Parse JSON
-                parsed = json.loads(raw_content)
-                
-                # Validate with Pydantic
+                # Strip markdown fences if the model wraps JSON in ```
+                cleaned = raw_content.strip()
+                if cleaned.startswith("```"):
+                    lines = cleaned.split("\n")
+                    lines = [l for l in lines if not l.strip().startswith("```")]
+                    cleaned = "\n".join(lines)
+
+                # Parse JSON and validate with Pydantic
+                parsed = json.loads(cleaned)
                 response = LLMTurnResponse(**parsed)
-                
+
                 elapsed_ms = int((time.monotonic() - start_time) * 1000)
-                
-                # Extract token usage from OpenAI response
+
                 token_usage = {}
                 if completion.usage:
                     token_usage = {
@@ -226,10 +212,10 @@ class OpenAIClient:
                         "completion": completion.usage.completion_tokens,
                         "total": completion.usage.total_tokens,
                     }
-                
+
                 if attempt > 0:
                     logger.info(f"LLM retry succeeded on attempt {attempt + 1}")
-                
+
                 return LLMResult(
                     response=response,
                     response_time_ms=elapsed_ms,
@@ -239,20 +225,13 @@ class OpenAIClient:
 
             except json.JSONDecodeError as e:
                 last_error = e
-                logger.warning(
-                    f"LLM returned invalid JSON on attempt {attempt + 1}: {e}"
-                )
+                logger.warning(f"LLM returned invalid JSON on attempt {attempt + 1}: {e}")
             except (ValueError, TypeError) as e:
                 last_error = e
-                logger.warning(
-                    f"LLM response failed validation on attempt {attempt + 1}: {e}"
-                )
+                logger.warning(f"LLM response failed validation on attempt {attempt + 1}: {e}")
             except Exception as e:
                 last_error = e
-                logger.error(
-                    f"Unexpected error calling LLM on attempt {attempt + 1}: {e}"
-                )
-                # Don't retry on unexpected errors (auth, network, etc.)
+                logger.error(f"Unexpected error calling LLM on attempt {attempt + 1}: {e}")
                 break
 
         # All attempts failed — return safe fallback
@@ -263,11 +242,7 @@ class OpenAIClient:
         return _build_fallback(stage_id)
 
 
-def get_llm_client() -> OpenAIClient:
-    """
-    Factory function to create the LLM client.
-    
-    Currently returns OpenAIClient. To switch providers, change this
-    function — nothing else in the codebase needs to change.
-    """
-    return OpenAIClient()
+def get_llm_client() -> NavigatorClient:
+    """Factory function to create the LLM client."""
+    logger.info(f"Using LLM: {settings.LLM_MODEL} at {settings.LLM_BASE_URL}")
+    return NavigatorClient()

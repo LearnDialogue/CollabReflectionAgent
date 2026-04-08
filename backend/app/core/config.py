@@ -8,31 +8,27 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
+
     # Database
-    DATABASE_URL: str = "postgresql://evaluator:evaluator_dev@localhost:5432/evaluator"
-    
+    DATABASE_URL: str = "postgresql://evaluator:evaluator_dev@localhost:5433/evaluator"
+
     # JWT Settings
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
-    
-    # OpenAI
-    OPENAI_API_KEY: str = ""
-    # Optional override for OpenAI-compatible endpoints (e.g. Ollama)
-    # Examples:
-    # - http://127.0.0.1:11434/v1
-    # - http://host.docker.internal:11434/v1 (from inside Docker on macOS)
-    OPENAI_BASE_URL: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
-    
+
+    # LLM — any OpenAI-compatible endpoint (UF Navigator, OpenAI, etc.)
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = "https://api.ai.it.ufl.edu/v1/"  # UF Navigator
+    LLM_MODEL: str = "llama-3.3-70b-instruct"
+
     # LLM Behaviour
     LLM_MAX_RETRIES: int = 2          # retry on bad JSON
     LLM_STAGE_MAX_TURNS: int = 5      # safety-valve: force-advance after N turns
-    
+
     # App Settings
     DEBUG: bool = False
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True
