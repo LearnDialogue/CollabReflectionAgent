@@ -27,6 +27,10 @@ declare global {
       sendState: (state: string) => void;
       sendUserMessage: (message: string) => void;
       sendAssistantMessage: (message: string) => void;
+      sendGesture: (gesture: string) => void;
+      sendExpression: (expression: string) => void;
+      playNextGesture: () => void;
+      playNextExpression: () => void;
     };
   }
 }
@@ -128,6 +132,18 @@ export default function UnityAvatarPanel() {
           },
           sendAssistantMessage: (message: string) => {
             instance.SendMessage?.("ChatLLM", "OnAssistantMessage", message);
+          },
+          sendGesture: (gesture: string) => {
+            instance.SendMessage?.("ChatLLM", "PlayGesture", gesture);
+          },
+          sendExpression: (expression: string) => {
+            instance.SendMessage?.("ChatLLM", "PlayExpression", expression);
+          },
+          playNextGesture: () => {
+            instance.SendMessage?.("ChatLLM", "PlayNextGesture");
+          },
+          playNextExpression: () => {
+            instance.SendMessage?.("ChatLLM", "PlayNextExpression");
           },
         };
         setHasError(false);
