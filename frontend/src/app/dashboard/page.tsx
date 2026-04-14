@@ -365,6 +365,138 @@ function JsonPanel({
   );
 }
 
+function StudentProfilePanel({
+  student,
+  profile,
+  sourceSessionDate,
+}: {
+  student: Student | null;
+  profile: Record<string, unknown>;
+  sourceSessionDate: string | null;
+}) {
+  const personalDetails = (profile.personal_details || []) as string[];
+  const keyInsights = (profile.key_insights || []) as string[];
+  const unresolvedTopics = (profile.unresolved_topics || []) as string[];
+  const memoryHooks = (profile.memory_hooks || []) as string[];
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400">
+            Student Profile
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-900">
+            {String(profile.name || formatStudentLabel(student))}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            @{student?.username || "unknown"}
+            {sourceSessionDate ? ` | derived from session on ${sourceSessionDate}` : ""}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg bg-gray-50 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Project Context</p>
+          <p className="mt-1 text-sm text-gray-700">
+            {String(profile.project_context || "N/A")}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Technical Background</p>
+          <p className="mt-1 text-sm text-gray-700">
+            {String(profile.technical_background || "N/A")}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Communication Style</p>
+          <p className="mt-1 text-sm text-gray-700">
+            {String(profile.communication_style || "N/A")}
+          </p>
+        </div>
+        <div className="rounded-lg bg-gray-50 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Emotional Patterns</p>
+          <p className="mt-1 text-sm text-gray-700">
+            {String(profile.emotional_patterns || "N/A")}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-gray-100 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Personal Details</p>
+          {personalDetails.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {personalDetails.map((detail, index) => (
+                <p key={index} className="text-sm text-gray-700">
+                  - {detail}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">No personal details captured yet.</p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-gray-100 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Motivations</p>
+          <p className="mt-2 text-sm text-gray-700">
+            {String(profile.motivations || "N/A")}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="rounded-lg border border-gray-100 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Key Insights</p>
+          {keyInsights.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {keyInsights.map((item, index) => (
+                <p key={index} className="text-sm text-gray-700">
+                  - {item}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">No key insights recorded.</p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-gray-100 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Unresolved Topics</p>
+          {unresolvedTopics.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {unresolvedTopics.map((item, index) => (
+                <p key={index} className="text-sm text-gray-700">
+                  - {item}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">No unresolved topics recorded.</p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-gray-100 p-4">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">Memory Hooks</p>
+          {memoryHooks.length > 0 ? (
+            <div className="mt-2 space-y-1">
+              {memoryHooks.map((item, index) => (
+                <p key={index} className="text-sm italic text-gray-700">
+                  "{item}"
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-gray-500">No memory hooks captured yet.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -632,6 +764,22 @@ export default function DashboardPage() {
     : null;
   const selectedSessionDate = selectedSession
     ? new Date(selectedSession.started_at).toLocaleDateString([], {
+        timeZone: "America/New_York",
+      })
+    : null;
+  const latestProfileSession =
+    selectedStudentSessions.find(
+      (session) =>
+        Boolean(
+          (session.evaluation_data as Record<string, unknown> | null)?.student_profile
+        )
+    ) || null;
+  const selectedStudentProfile = latestProfileSession
+    ? ((latestProfileSession.evaluation_data as Record<string, unknown>).student_profile as
+        Record<string, unknown>)
+    : null;
+  const selectedStudentProfileDate = latestProfileSession
+    ? new Date(latestProfileSession.started_at).toLocaleDateString([], {
         timeZone: "America/New_York",
       })
     : null;
@@ -1044,6 +1192,14 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500">
                 Viewing {selectedStudentSessions.length} conversation{selectedStudentSessions.length !== 1 ? "s" : ""} for {formatStudentLabel(selectedStudent)}.
               </p>
+
+              {selectedStudentProfile && (
+                <StudentProfilePanel
+                  student={selectedStudent}
+                  profile={selectedStudentProfile}
+                  sourceSessionDate={selectedStudentProfileDate}
+                />
+              )}
 
               <div className="rounded-xl border border-gray-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
