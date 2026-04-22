@@ -16,7 +16,7 @@ from app.services.llm_client import (
     _build_fallback,
     FALLBACK_RESPONSES,
 )
-from app.schemas.llm import LLMTurnResponse, RoutingSignal
+from app.schemas.llm import LLMTurnResponse, RoutingSignal, TutorGesture, TutorExpression
 from app.core.prompts import build_system_prompt
 
 
@@ -26,17 +26,18 @@ class TestFallback:
     def test_fallback_returns_valid_response(self):
         """Every stage produces a valid LLMTurnResponse fallback."""
         for stage_id in FALLBACK_RESPONSES:
-            fb = _build_fallback(stage_id)
-            assert isinstance(fb, LLMTurnResponse)
-            assert fb.stage_completed is False
-            assert fb.routing_signal == RoutingSignal.STAY
-            assert fb.reflection_data["fallback"] is True
+            result = _build_fallback(stage_id)
+            assert isinstance(result.response, LLMTurnResponse)
+            assert result.response.stage_completed is False
+            assert result.response.routing_signal == RoutingSignal.STAY
+            assert result.response.tutor_gesture == TutorGesture.IDLE
+            assert result.response.reflection_data["fallback"] is True
 
     def test_fallback_unknown_stage(self):
         """Unknown stage still produces a valid fallback."""
-        fb = _build_fallback("nonexistent_stage")
-        assert isinstance(fb, LLMTurnResponse)
-        assert len(fb.student_text) > 0
+        result = _build_fallback("nonexistent_stage")
+        assert isinstance(result.response, LLMTurnResponse)
+        assert len(result.response.tutor_response) > 0
 
     def test_fallback_text_is_human_readable(self):
         """Fallback text should be a real sentence, not an error message."""
@@ -75,12 +76,12 @@ class TestNoKeyFallback:
         system_prompt = build_system_prompt("greeting", student_name="Test")
         messages = [{"role": "user", "content": "Hello"}]
 
-        response = asyncio.run(
+        result = asyncio.run(
             client.generate_response(messages, system_prompt, "greeting")
         )
 
-        assert isinstance(response, LLMTurnResponse)
-        assert response.reflection_data["fallback"] is True
+        assert isinstance(result.response, LLMTurnResponse)
+        assert result.response.reflection_data["fallback"] is True
 
 
 class TestLiveAPICall:
@@ -101,17 +102,18 @@ class TestLiveAPICall:
         ]
 
         try:
-            response = asyncio.run(
+            result = asyncio.run(
                 client.generate_response(messages, system_prompt, "greeting")
             )
         except Exception:
             pytest.skip("API call failed (likely quota issue)")
 
-        assert isinstance(response, LLMTurnResponse)
-        assert len(response.student_text) > 0
+        assert isinstance(result.response, LLMTurnResponse)
+        assert len(result.response.tutor_response) > 0
 
         # If we got a non-fallback response, it means the LLM actually replied
-        if response.reflection_data and response.reflection_data.get("fallback"):
+        if result.response.reflection_data and result.response.reflection_data.get("fallback"):
             pytest.skip("Got fallback response (likely quota issue)")
 
-        assert response.routing_signal in (RoutingSignal.NEXT, RoutingSignal.STAY)
+        assert result.response.routing_signal in (RoutingSignal.NEXT, RoutingSignal.STAY)
+        assert result.response.tutor_gesture in list(TutorGesture)

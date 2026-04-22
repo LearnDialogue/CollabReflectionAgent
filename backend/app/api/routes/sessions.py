@@ -11,7 +11,7 @@ from app.api.deps import DBSession, CurrentUser
 from app.models.session import Session as ChatSession, SessionStatus
 from app.models.message import Message, MessageRole
 from app.schemas.session import SessionRead, SessionList
-from app.schemas.message import MessageRead, ChatRequest, ChatResponse
+from app.schemas.message import MessageRead, ChatRequest, ChatResponse, InitiateResponse
 from app.services.flow_engine import FlowEngine
 from app.services.llm_client import get_llm_client
 from app.services.session_evaluator import evaluate_session
@@ -130,6 +130,68 @@ def get_session_messages(
     )
 
     return messages
+
+
+@router.post("/{session_id}/initiate", response_model=InitiateResponse)
+async def initiate_session(
+    session_id: UUID,
+    db: DBSession,
+    current_user: CurrentUser,
+) -> InitiateResponse:
+    """
+    Generate the tutor's opening greeting for a new session.
+    Only works when the session has zero messages (fresh session).
+    """
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if session.student_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this session",
+        )
+
+    # Only allow initiation on sessions with no messages
+    existing_count = (
+        db.query(func.count(Message.id))
+        .filter(Message.session_id == session_id)
+        .scalar()
+    )
+    if existing_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Session already has messages. Use /chat instead.",
+        )
+
+    # Process with FlowEngine — no user input
+    llm_client = get_llm_client()
+    engine = FlowEngine(session, [], current_user, llm_client)
+    response_content, new_stage, is_complete, llm_metadata = await engine.process()
+
+    # Save only the assistant message
+    assistant_message = Message(
+        session_id=session_id,
+        role=MessageRole.assistant,
+        content=response_content,
+        stage_id=new_stage,
+        llm_metadata=llm_metadata,
+    )
+    db.add(assistant_message)
+
+    session.current_stage = new_stage
+    db.commit()
+    db.refresh(assistant_message)
+    db.refresh(session)
+
+    return InitiateResponse(
+        assistant_message=MessageRead.model_validate(assistant_message),
+        session_status=session.status.value,
+        current_stage=session.current_stage,
+    )
 
 
 @router.post("/{session_id}/chat", response_model=ChatResponse)

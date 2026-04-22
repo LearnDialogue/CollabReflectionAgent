@@ -44,9 +44,12 @@ class FlowEngine:
         self.llm_client = llm_client
         self.current_stage = session.current_stage
 
-    async def process(self, user_input: str) -> tuple[str, str, bool, Optional[dict]]:
+    async def process(self, user_input: Optional[str] = None) -> tuple[str, str, bool, Optional[dict]]:
         """
         Process user input and generate an LLM response.
+
+        When user_input is None the engine generates an initial greeting
+        with no preceding user message (tutor-initiated conversation).
 
         Returns:
             (response_text, new_stage, is_complete, llm_metadata)
@@ -62,12 +65,22 @@ class FlowEngine:
         # Build message history for the LLM
         messages = self._build_message_history(user_input)
 
-        # Call the LLM
-        llm_result = await self.llm_client.generate_response(
-            messages=messages,
-            system_prompt=system_prompt,
-            stage_id=self.current_stage,
-        )
+        # Use the stronger quality model for wrap_up (summary matters)
+        use_quality_model = self.current_stage == "wrap_up"
+        if use_quality_model and settings.LLM_QUALITY_MODEL != settings.LLM_MODEL:
+            from app.services.llm_client import NavigatorClient
+            quality_client = NavigatorClient(model=settings.LLM_QUALITY_MODEL)
+            llm_result = await quality_client.generate_response(
+                messages=messages,
+                system_prompt=system_prompt,
+                stage_id=self.current_stage,
+            )
+        else:
+            llm_result = await self.llm_client.generate_response(
+                messages=messages,
+                system_prompt=system_prompt,
+                stage_id=self.current_stage,
+            )
         llm_response = llm_result.response
 
         # Check safety valve: force-advance if too many turns in this stage
@@ -101,8 +114,10 @@ class FlowEngine:
         llm_metadata = {
             "routing_signal": llm_response.routing_signal.value,
             "stage_completed": llm_response.stage_completed,
+            "tutor_gesture": llm_response.tutor_gesture.value,
+            "tutor_expression": llm_response.tutor_expression.value,
             "reflection_data": llm_response.reflection_data,
-            "model": settings.LLM_MODEL,
+            "model": settings.LLM_QUALITY_MODEL if use_quality_model else settings.LLM_MODEL,
             "prompt_version": "v1",
             "forced_advance": forced_advance,
             "response_time_ms": llm_result.response_time_ms,
@@ -110,12 +125,15 @@ class FlowEngine:
             "attempt_number": llm_result.attempt_number,
         }
 
-        return llm_response.student_text, new_stage, is_complete, llm_metadata
+        return llm_response.tutor_response, new_stage, is_complete, llm_metadata
 
-    def _build_message_history(self, current_input: str) -> list[dict]:
+    def _build_message_history(self, current_input: Optional[str] = None) -> list[dict]:
         """
         Convert DB message history + current user input into the
         [{role, content}] format the LLM expects.
+
+        When current_input is None (tutor-initiated greeting), the user
+        message is omitted so the LLM speaks first.
         """
         messages = []
         for msg in self.history:
@@ -125,10 +143,11 @@ class FlowEngine:
             })
 
         # Add the current user message (not yet in DB history)
-        messages.append({
-            "role": "user",
-            "content": current_input,
-        })
+        if current_input is not None:
+            messages.append({
+                "role": "user",
+                "content": current_input,
+            })
 
         return messages
 

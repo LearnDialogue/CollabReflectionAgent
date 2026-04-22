@@ -50,3 +50,11 @@ class ChatResponse(BaseModel):
     assistant_message: MessageRead
     session_status: str
     current_stage: str
+
+
+class InitiateResponse(BaseModel):
+    """Tutor-initiated opening message (no user message)."""
+
+    assistant_message: MessageRead
+    session_status: str
+    current_stage: str

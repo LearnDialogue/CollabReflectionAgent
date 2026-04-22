@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     # LLM — any OpenAI-compatible endpoint (UF Navigator, OpenAI, etc.)
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = "https://api.ai.it.ufl.edu/v1/"  # UF Navigator
-    LLM_MODEL: str = "llama-3.3-70b-instruct"
+    LLM_MODEL: str = "llama-3.1-8b-instruct"
+    LLM_QUALITY_MODEL: str = "llama-3.3-70b-instruct"  # stronger model for wrap-up / evaluation
 
     # LLM Behaviour
     LLM_MAX_RETRIES: int = 2          # retry on bad JSON

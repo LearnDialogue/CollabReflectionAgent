@@ -79,6 +79,10 @@ export const sessionsApi = {
     const response = await api.post(`/sessions/${sessionId}/chat`, { content });
     return response.data;
   },
+  initiate: async (sessionId: string) => {
+    const response = await api.post(`/sessions/${sessionId}/initiate`);
+    return response.data;
+  },
   complete: async (sessionId: string) => {
     const response = await api.post(`/sessions/${sessionId}/complete`);
     return response.data;

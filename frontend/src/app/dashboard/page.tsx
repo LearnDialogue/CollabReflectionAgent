@@ -8,6 +8,10 @@ import MessageCard from "@/components/MessageCard";
 import StageProgressBar from "@/components/StageProgressBar";
 import UnityAvatarPanel from "@/components/UnityAvatarPanel";
 
+/* ------------------------------------------------------------------ */
+/*  Unity bridge helpers                                               */
+/* ------------------------------------------------------------------ */
+
 function sendAvatarState(state: string) {
   if (typeof window === "undefined") return;
   window.unityAvatarBridge?.sendState(state);
@@ -18,10 +22,21 @@ function sendAvatarUserMessage(message: string) {
   window.unityAvatarBridge?.sendUserMessage(message);
 }
 
-function sendAvatarAssistantMessage(message: string) {
+function sendAvatarCommand(command: {
+  state?: string;
+  gesture?: string;
+  expression?: string;
+  text?: string;
+  speechText?: string;
+  displayInTranscript?: boolean;
+}) {
   if (typeof window === "undefined") return;
-  window.unityAvatarBridge?.sendAssistantMessage(message);
+  window.unityAvatarBridge?.sendCommand(command);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
 interface Message {
   id: string;
@@ -96,7 +111,6 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
 
   return (
     <div className="mx-2 my-3 rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-indigo-100/60 border-b border-indigo-200">
         <h3 className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
           Session Evaluation
@@ -109,7 +123,6 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Score banner */}
         {quality && (
           <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-indigo-100">
             <div className="text-2xl font-bold text-indigo-700 shrink-0">{score}/5</div>
@@ -137,7 +150,6 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
           </div>
         )}
 
-        {/* 2x2 grid - compact */}
         <div className="grid grid-cols-2 gap-3">
           {flow && (
             <div className="p-2.5 bg-white rounded-lg border border-gray-100">
@@ -205,7 +217,7 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
                 <div className="mt-1">
                   <p className="text-[10px] text-purple-600">Remember for next time:</p>
                   {((profile.memory_hooks) as string[]).map((h, i) => (
-                    <p key={i} className="text-[10px] text-gray-600 ml-2 italic">"{h}"</p>
+                    <p key={i} className="text-[10px] text-gray-600 ml-2 italic">&quot;{h}&quot;</p>
                   ))}
                 </div>
               )}
@@ -228,7 +240,6 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
           )}
         </div>
 
-        {/* CPS Complaint Analysis */}
         {cps && (
           <div className="p-3 bg-white rounded-lg border border-gray-100">
             <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">CPS Complaint Analysis</h4>
@@ -272,7 +283,6 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
           </div>
         )}
 
-        {/* Recommendations */}
         {recs && (
           <div className="p-3 bg-white rounded-lg border border-gray-100">
             <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Recommendations</h4>
@@ -299,7 +309,6 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
           </div>
         )}
 
-        {/* Raw JSON toggle */}
         <div className="pt-2 border-t border-indigo-100">
           <button
             onClick={() => setShowRaw(!showRaw)}
@@ -497,6 +506,29 @@ function StudentProfilePanel({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Demo mode — pre-scripted student messages for live demos           */
+/* ------------------------------------------------------------------ */
+
+const DEMO_MESSAGES = [
+  "We've been working on our line following robot for the obstacle course competition",
+  "Yea so its a robot that follows a black line on the ground. I do the coding part",
+  "Oh okay so we're using an Arduino with three IR sensors on the bottom to detect the line. I'm writing the PID controller in C++ that adjusts the two motors based on sensor readings. My team is me Sarah and Marcus and we have to demo next Friday but the robot keeps drifting off on sharp turns",
+  "I dunno it was just frustrating. Marcus was being annoying and the sensors weren't really working",
+  "Ok so basically me and Sarah kept arguing about where to mount the sensors. I wanted them close together for faster response and she wanted them spread wider to detect turns earlier. We literally spent two full lab sessions going back and forth instead of testing anything. And Marcus just sat there the whole time not saying a single word which made everything worse. We went with my design and now it doesn't work on sharp turns so I'm thinking Sarah was probably right",
+  "I guess I just learned that teamwork is important and we need to communicate better",
+  "Okay yeah that is pretty vague. Honestly the real issue was I was so focused on winning the argument that I never even thought about just testing both options. It would have taken like 20 minutes to try Sarah's layout and look at the actual numbers. Instead we wasted two sessions arguing opinions instead of looking at data. I think when two people disagree about something technical you should just test both and let the results decide instead of trying to be right",
+  "Two things we could try. One is just swap to Sarah's wider sensor spacing and measure if it handles the turns better. Two is keep my layout but add a fourth sensor on the outside specifically for curves. Sarah's way is simpler and we already have the parts plus it would show her I actually respect her input. The fourth sensor might be better technically but I'd have to completely rewrite the PID logic and we only have a week",
+  "Tomorrow in lab I'm gonna talk to Sarah and tell her I want to try her sensor layout. We'll set up both and run each one through the sharp turn section 10 times and compare how many times it stays on the line. If hers works better on turns without messing up the straight parts we go with that. I'll have results by Wednesday so we have Thursday and Friday to tune for the demo",
+  "Yeah that sounds like a solid plan to me",
+  "Yeah that really captures it. Thanks this was actually super helpful. See ya!",
+  "Yep I'm all good thanks! Bye!",
+];
+
+/* ------------------------------------------------------------------ */
+/*  Main dashboard page                                                */
+/* ------------------------------------------------------------------ */
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -514,14 +546,20 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [adminSearch, setAdminSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SessionStatusFilter>("ALL");
+  const [showFullHistory, setShowFullHistory] = useState(false);
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
+  const [demoStep, setDemoStep] = useState(-1);
+  const [isDemoTyping, setIsDemoTyping] = useState(false);
+  const demoAbortRef = useRef(false);
+  const demoSessionRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const overlayEndRef = useRef<HTMLDivElement>(null);
+  const overlayScrollRef = useRef<HTMLDivElement>(null);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
 
-  // Load sessions and stage config on mount
   useEffect(() => {
     if (user) {
       loadDashboardData();
@@ -532,8 +570,16 @@ export default function DashboardPage() {
   // Scroll to bottom when messages change
   useEffect(() => {
     if (user?.role === "admin") return;
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, user?.role]);
+    if (showFullHistory) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    } else if (overlayScrollRef.current) {
+      setTimeout(() => {
+        if (overlayScrollRef.current) {
+          overlayScrollRef.current.scrollTop = overlayScrollRef.current.scrollHeight;
+        }
+      }, 50);
+    }
+  }, [messages, showFullHistory, user?.role]);
 
   const loadStages = async () => {
     try {
@@ -591,6 +637,33 @@ export default function DashboardPage() {
     }
   };
 
+  const initiateSession = async (session: Session) => {
+    try {
+      sendAvatarState("thinking");
+      const response = await sessionsApi.initiate(session.id);
+      setMessages([response.assistant_message]);
+      setSelectedSession((prev) =>
+        prev ? { ...prev, current_stage: response.current_stage } : null
+      );
+      const gesture =
+        (response.assistant_message.llm_metadata?.tutor_gesture as string) || "singleWave";
+      const expression =
+        (response.assistant_message.llm_metadata?.tutor_expression as string) || "warmSmile";
+      sendAvatarCommand({
+        gesture,
+        expression,
+        text: response.assistant_message.content,
+        displayInTranscript: false,
+        state: "",
+        speechText: "",
+      });
+      sendAvatarState(gesture);
+    } catch (err) {
+      console.error("Failed to initiate session:", err);
+      sendAvatarState("idle");
+    }
+  };
+
   const selectSession = async (session: Session, adminMode = user?.role === "admin") => {
     setSelectedSession(session);
     setIsLoadingMessages(true);
@@ -604,8 +677,12 @@ export default function DashboardPage() {
         setMessages(messageData);
       } else {
         const msgs = await sessionsApi.getMessages(session.id);
-        setSelectedSession(session);
         setMessages(msgs);
+        if (msgs.length === 0 && session.status === "ACTIVE") {
+          setIsLoadingMessages(false);
+          await initiateSession(session);
+          return;
+        }
       }
     } catch (err) {
       console.error("Failed to load messages:", err);
@@ -623,6 +700,9 @@ export default function DashboardPage() {
       setSessions((prev) => [newSession, ...prev]);
       setSelectedSession(newSession);
       setMessages([]);
+      setShowFullHistory(false);
+      // Auto-initiate the greeting
+      await initiateSession(newSession);
     } catch (err) {
       console.error("Failed to create session:", err);
     }
@@ -655,7 +735,6 @@ export default function DashboardPage() {
             }
           : null
       );
-      // Update session in sidebar
       setSessions((prev) =>
         prev.map((s) =>
           s.id === selectedSession.id
@@ -663,9 +742,24 @@ export default function DashboardPage() {
             : s
         )
       );
-      sendAvatarAssistantMessage(response.assistant_message.content);
-      sendAvatarState("listening");
-      // If session just completed, re-fetch to get evaluation_data
+
+      // Send gesture + expression to Unity
+      const gesture =
+        (response.assistant_message.llm_metadata?.tutor_gesture as string) || "idle";
+      const expression =
+        (response.assistant_message.llm_metadata?.tutor_expression as string) || "neutral";
+      // Use new unified command (for builds with ReceiveLlmCommandJson)
+      sendAvatarCommand({
+        gesture,
+        expression,
+        text: response.assistant_message.content,
+        displayInTranscript: false,
+        state: "",
+        speechText: "",
+      });
+      // Also call legacy methods so the current build still works
+      sendAvatarState(gesture);
+
       if (response.session_status === "COMPLETED") {
         try {
           const updated = await sessionsApi.get(selectedSession.id);
@@ -685,7 +779,165 @@ export default function DashboardPage() {
     }
   };
 
-  // Compute turn counts per stage for the progress bar
+  /* ---------------------------------------------------------------- */
+  /*  Demo mode — step-by-step with typing animation                   */
+  /*  Presenter clicks "Next" to send each scripted message.           */
+  /* ---------------------------------------------------------------- */
+
+  const typeText = (text: string, charDelay = 20): Promise<void> => {
+    return new Promise((resolve) => {
+      let i = 0;
+      setInput("");
+      const interval = setInterval(() => {
+        if (demoAbortRef.current) {
+          clearInterval(interval);
+          resolve();
+          return;
+        }
+        i++;
+        setInput(text.slice(0, i));
+        if (i >= text.length) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, charDelay);
+    });
+  };
+
+  // Start demo: create session, initiate greeting, then wait for presenter
+  const startDemo = async () => {
+    demoAbortRef.current = false;
+    setIsDemoRunning(true);
+    setDemoStep(-1);
+
+    try {
+      const newSession = await sessionsApi.create();
+      setSessions((prev) => [newSession, ...prev]);
+      setSelectedSession(newSession);
+      setMessages([]);
+      setShowFullHistory(false);
+      demoSessionRef.current = newSession.id;
+
+      // Initiate the tutor greeting
+      sendAvatarState("thinking");
+      const initResp = await sessionsApi.initiate(newSession.id);
+      setMessages([initResp.assistant_message]);
+      setSelectedSession((prev) =>
+        prev ? { ...prev, current_stage: initResp.current_stage } : null
+      );
+      const greetGesture =
+        (initResp.assistant_message.llm_metadata?.tutor_gesture as string) || "singleWave";
+      const greetExpr =
+        (initResp.assistant_message.llm_metadata?.tutor_expression as string) || "warmSmile";
+      sendAvatarCommand({
+        gesture: greetGesture,
+        expression: greetExpr,
+        text: initResp.assistant_message.content,
+        displayInTranscript: false,
+        state: "",
+        speechText: "",
+      });
+      sendAvatarState(greetGesture);
+
+      // Ready for presenter to click "Next" for the first student message
+      setDemoStep(0);
+    } catch (err) {
+      console.error("Demo start failed:", err);
+      setIsDemoRunning(false);
+    }
+  };
+
+  // Send the next demo message (called when presenter clicks Next)
+  const demoNext = async () => {
+    if (!demoSessionRef.current || demoStep < 0 || demoStep >= DEMO_MESSAGES.length) return;
+    if (isDemoTyping || isSending) return;
+
+    const msg = DEMO_MESSAGES[demoStep];
+    setIsDemoTyping(true);
+
+    // Type animation
+    await typeText(msg);
+    if (demoAbortRef.current) { setIsDemoTyping(false); return; }
+
+    // Brief pause so audience reads what was typed
+    await new Promise((r) => setTimeout(r, 600));
+    if (demoAbortRef.current) { setIsDemoTyping(false); return; }
+
+    // Submit
+    setInput("");
+    setIsSending(true);
+    sendAvatarUserMessage(msg);
+    sendAvatarState("thinking");
+
+    try {
+      const response = await sessionsApi.chat(demoSessionRef.current, msg);
+      setMessages((prev) => [
+        ...prev,
+        response.user_message,
+        response.assistant_message,
+      ]);
+      setSelectedSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              current_stage: response.current_stage,
+              status: response.session_status,
+            }
+          : null
+      );
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === demoSessionRef.current
+            ? { ...s, current_stage: response.current_stage, status: response.session_status }
+            : s
+        )
+      );
+
+      const gesture =
+        (response.assistant_message.llm_metadata?.tutor_gesture as string) || "idle";
+      const expression =
+        (response.assistant_message.llm_metadata?.tutor_expression as string) || "neutral";
+      sendAvatarCommand({
+        gesture,
+        expression,
+        text: response.assistant_message.content,
+        displayInTranscript: false,
+        state: "",
+        speechText: "",
+      });
+      sendAvatarState(gesture);
+
+      if (response.session_status === "COMPLETED") {
+        try {
+          const updated = await sessionsApi.get(demoSessionRef.current);
+          setSelectedSession(updated);
+          setSessions((prev) =>
+            prev.map((s) => (s.id === updated.id ? updated : s))
+          );
+        } catch (_) {}
+        setDemoStep(-1);
+        setIsDemoRunning(false);
+      } else {
+        // Advance to next message
+        setDemoStep((prev) => prev + 1);
+      }
+    } catch (err) {
+      console.error("Demo chat failed:", err);
+    } finally {
+      setIsSending(false);
+      setIsDemoTyping(false);
+    }
+  };
+
+  const stopDemo = () => {
+    demoAbortRef.current = true;
+    setIsDemoRunning(false);
+    setIsDemoTyping(false);
+    setDemoStep(-1);
+    setInput("");
+    demoSessionRef.current = null;
+  };
+
   const turnCounts: Record<string, number> = {};
   messages
     .filter((m) => m.role === "assistant")
@@ -817,36 +1069,665 @@ export default function DashboardPage() {
 
   const isAdmin = user.role === "admin";
 
-  return (
-    <main className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      {!isAdmin && (
-      <aside
-        className={`${
-          sidebarOpen ? "w-72" : "w-0"
-        } transition-all duration-200 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}
-      >
-        {/* Sidebar header */}
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                {isAdmin ? "Students" : "Sessions"}
-              </h2>
-              {isAdmin && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Pick a student to review their conversations and evaluation data.
-                </p>
+  // Last few messages for the overlay (student view)
+  const recentMessages = messages.slice(-6);
+  const latestAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+
+  /* ================================================================ */
+  /*  ADMIN VIEW — traditional chat layout (unchanged behavior)        */
+  /* ================================================================ */
+  if (isAdmin) {
+    return (
+      <main className="flex h-screen bg-gray-50">
+        {/* Sidebar */}
+        {!isAdmin && (
+        <aside
+          className={`${
+            sidebarOpen ? "w-72" : "w-0"
+          } transition-all duration-200 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}
+        >
+          {/* Sidebar header */}
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  {isAdmin ? "Students" : "Sessions"}
+                </h2>
+                {isAdmin && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Pick a student to review their conversations and evaluation data.
+                  </p>
+                )}
+              </div>
+              {!isAdmin && (
+                <button
+                  onClick={createNewSession}
+                  className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  + New
+                </button>
               )}
             </div>
-            {!isAdmin && (
-              <button
-                onClick={createNewSession}
-                className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                + New
-              </button>
+            {isAdmin && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={adminSearch}
+                  onChange={(e) => setAdminSearch(e.target.value)}
+                  placeholder="Search student, username, or stage"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as SessionStatusFilter)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="ALL">All statuses</option>
+                  <option value="ACTIVE">Active only</option>
+                  <option value="COMPLETED">Completed only</option>
+                </select>
+              </div>
             )}
+          </div>
+  
+          {/* Session list */}
+          <div className="flex-1 overflow-y-auto">
+            {isLoadingSessions ? (
+              <div className="p-4 text-sm text-gray-400">Loading sessions...</div>
+            ) : isAdmin && filteredStudents.length === 0 ? (
+              <div className="p-4 text-sm text-gray-400">
+                No students match the current filters.
+              </div>
+            ) : !isAdmin && sessions.length === 0 ? (
+              <div className="p-4 text-sm text-gray-400">
+                No sessions yet. Create one!
+              </div>
+            ) : (
+              isAdmin
+                ? filteredStudents.map((student) => {
+                    const sessionsForStudent = (studentSessionsMap[student.id] || []).sort(
+                      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+                    );
+                    const latestSession = sessionsForStudent[0];
+                    const activeCount = sessionsForStudent.filter((session) => session.status === "ACTIVE").length;
+                    const evaluatedCount = sessionsForStudent.filter(
+                      (session) => getSessionScore(session) !== null
+                    ).length;
+  
+                    return (
+                      <button
+                        key={student.id}
+                        onClick={() => handleSelectStudent(student.id)}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                          selectedStudentId === student.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="truncate text-sm font-medium text-gray-900">
+                            {formatStudentLabel(student)}
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {sessionsForStudent.length} convo{sessionsForStudent.length !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-gray-500">@{student.username}</p>
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-gray-500">
+                          <span>{latestSession ? formatStageLabel(latestSession.current_stage) : "No sessions"}</span>
+                          <span>{activeCount > 0 ? `${activeCount} active` : `${evaluatedCount} evaluated`}</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                : sessions.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => selectSession(s)}
+                      className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                        selectedSession?.id === s.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            s.status === "ACTIVE"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {s.status === "ACTIVE" ? "Active" : "Done"}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(s.started_at).toLocaleDateString([], { timeZone: "America/New_York" })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        Started {new Date(s.started_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "America/New_York",
+                        })}
+                      </p>
+                    </button>
+                  ))
+            )}
+          </div>
+  
+          {/* Sidebar footer */}
+          <div className="p-3 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500 truncate">
+                {user.display_name || user.username}
+                {isAdmin && (
+                  <span className="ml-1 text-[10px] text-purple-600 font-medium">
+                    ADMIN
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={logout}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </aside>
+        )}
+  
+        {/* Main chat area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <header className="bg-white border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {!isAdmin && (
+                  <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    {sidebarOpen ? "\u2039" : "\u203A"}
+                  </button>
+                )}
+                {isAdmin && selectedStudentId && (
+                  <button
+                    onClick={returnToStudentDirectory}
+                    className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  >
+                    Back to Students
+                  </button>
+                )}
+                <div>
+                  {isAdmin ? (
+                    <>
+                      <h1 className="text-base font-semibold text-gray-900">
+                        {!selectedStudentId
+                          ? "Admin Dashboard"
+                          : formatStudentLabel(selectedStudent)}
+                      </h1>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {!selectedStudentId
+                          ? "Browse students and open a conversation to inspect details."
+                          : selectedSession
+                            ? `Session on ${selectedSessionDate} | ${selectedSession.status} | ${formatStageLabel(selectedSession.current_stage)}`
+                            : `@${selectedStudent?.username || "unknown"} | ${selectedStudentSessions.length} conversation${selectedStudentSessions.length !== 1 ? "s" : ""} | latest ${selectedStudentLatestDate || "N/A"}`}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="text-base font-semibold text-gray-900">
+                        Reflection Session
+                      </h1>
+                      {selectedSession && (
+                        <div className="mt-1">
+                          <StageProgressBar
+                            currentStage={selectedSession.current_stage}
+                            isCompleted={selectedSession.status === "COMPLETED"}
+                            turnCounts={turnCounts}
+                            compact
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={logout}
+                  className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                >
+                  Logout
+                </button>
+              )}
+            </div>
+          </header>
+  
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-messages">
+            {!isAdmin && <UnityAvatarPanel />}
+  
+            {isAdmin && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <AdminMetricCard
+                  label="Students With Sessions"
+                  value={String(totalStudents)}
+                />
+                <AdminMetricCard
+                  label="Completed Sessions"
+                  value={String(completedSessions.length)}
+                />
+                <AdminMetricCard label="Completion Rate" value={completionRate} />
+                <AdminMetricCard
+                  label="Average Evaluation"
+                  value={averageScore === "N/A" ? averageScore : `${averageScore}/5`}
+                />
+              </div>
+            )}
+  
+            {isAdmin && !selectedStudentId && (
+              <div className="space-y-6">
+                <div className="rounded-xl border border-gray-200 bg-white p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-400">
+                        Student Directory
+                      </p>
+                      <h2 className="mt-1 text-xl font-semibold text-gray-900">
+                        All Students
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Select a student to open their conversation history, evaluations, and raw JSON.
+                      </p>
+                    </div>
+                    <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[320px]">
+                      <input
+                        type="text"
+                        value={adminSearch}
+                        onChange={(e) => setAdminSearch(e.target.value)}
+                        placeholder="Search student, username, or stage"
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as SessionStatusFilter)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="ALL">All statuses</option>
+                        <option value="ACTIVE">Active only</option>
+                        <option value="COMPLETED">Completed only</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+  
+                {filteredStudents.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+                    No students match the current filters.
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {filteredStudents.map((student) => {
+                      const sessionsForStudent = (studentSessionsMap[student.id] || []).sort(
+                        (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+                      );
+                      const latestSession = sessionsForStudent[0];
+                      const activeCount = sessionsForStudent.filter((session) => session.status === "ACTIVE").length;
+                      const averageStudentScore =
+                        sessionsForStudent.filter((session) => getSessionScore(session) !== null).length > 0
+                          ? (
+                              sessionsForStudent.reduce(
+                                (sum, session) => sum + (getSessionScore(session) || 0),
+                                0
+                              ) /
+                              sessionsForStudent.filter((session) => getSessionScore(session) !== null).length
+                            ).toFixed(1)
+                          : null;
+  
+                      return (
+                        <button
+                          key={student.id}
+                          onClick={() => handleSelectStudent(student.id)}
+                          className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-blue-300 hover:bg-blue-50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {formatStudentLabel(student)}
+                              </p>
+                              <p className="mt-1 text-sm text-gray-500">@{student.username}</p>
+                            </div>
+                            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+                              {sessionsForStudent.length} conversation{sessionsForStudent.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+  
+                          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-lg bg-gray-50 p-3">
+                              <p className="text-[10px] uppercase tracking-wide text-gray-400">Current Focus</p>
+                              <p className="mt-1 text-gray-700">
+                                {latestSession ? formatStageLabel(latestSession.current_stage) : "No sessions"}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-gray-50 p-3">
+                              <p className="text-[10px] uppercase tracking-wide text-gray-400">Status</p>
+                              <p className="mt-1 text-gray-700">
+                                {activeCount > 0 ? `${activeCount} active` : "No active sessions"}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-gray-50 p-3">
+                              <p className="text-[10px] uppercase tracking-wide text-gray-400">Latest Session</p>
+                              <p className="mt-1 text-gray-700">
+                                {latestSession
+                                  ? new Date(latestSession.started_at).toLocaleDateString([], {
+                                      timeZone: "America/New_York",
+                                    })
+                                  : "N/A"}
+                              </p>
+                            </div>
+                            <div className="rounded-lg bg-gray-50 p-3">
+                              <p className="text-[10px] uppercase tracking-wide text-gray-400">Average Eval</p>
+                              <p className="mt-1 text-gray-700">
+                                {averageStudentScore ? `${averageStudentScore}/5` : "No eval yet"}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+  
+            {!selectedSession && !isAdmin && (
+              <div className="text-center text-gray-400 mt-16">
+                <p className="text-lg">
+                  Select a session or create a new one
+                </p>
+              </div>
+            )}
+  
+            {selectedSession && isAdmin && selectedStudentId && (
+              <div className="space-y-4 mb-6">
+                <p className="text-sm text-gray-500">
+                  Viewing {selectedStudentSessions.length} conversation{selectedStudentSessions.length !== 1 ? "s" : ""} for {formatStudentLabel(selectedStudent)}.
+                </p>
+  
+                {selectedStudentProfile && (
+                  <StudentProfilePanel
+                    student={selectedStudent}
+                    profile={selectedStudentProfile}
+                    sourceSessionDate={selectedStudentProfileDate}
+                  />
+                )}
+  
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-400">
+                        Conversations
+                      </p>
+                      <h2 className="mt-1 text-lg font-semibold text-gray-900">
+                        {formatStudentLabel(selectedStudent)}
+                      </h2>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Select a conversation to inspect the full transcript and evaluation context.
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+                      {selectedStudentSessions.length} conversation{selectedStudentSessions.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {selectedStudentSessions.map((session) => {
+                      const score = getSessionScore(session);
+                      return (
+                        <button
+                          key={session.id}
+                          onClick={() => selectSession(session, true)}
+                          className={`rounded-xl border p-4 text-left transition-colors ${
+                            selectedSession.id === session.id
+                              ? "border-blue-300 bg-blue-50"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                session.status === "ACTIVE"
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {session.status === "ACTIVE" ? "Active" : "Completed"}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(session.started_at).toLocaleDateString([], {
+                                timeZone: "America/New_York",
+                              })}
+                            </span>
+                          </div>
+                          <p className="mt-3 text-sm font-medium text-gray-900">
+                            {formatStageLabel(session.current_stage)}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {session.model_name || "model unknown"} | {session.prompt_version || "prompt unknown"}
+                          </p>
+                          <div className="mt-3 flex items-center justify-between text-[10px] text-gray-500">
+                            <span>{session.id.slice(0, 8)}</span>
+                            <span>{score !== null ? `${score}/5 score` : "No evaluation yet"}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+  
+                <div className="mx-auto flex max-w-6xl flex-col items-center gap-4">
+                  <div className="w-full max-w-4xl rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-gray-400">
+                          Session Summary
+                        </p>
+                        <h2 className="mt-1 text-lg font-semibold text-gray-900">
+                          {formatStudentLabel(selectedStudent)}
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-500">
+                          @{selectedStudent?.username || "unknown"} | {selectedSession.model_name || "model unknown"} | {selectedSession.prompt_version || "prompt unknown"}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            selectedSession.status === "COMPLETED"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {selectedSession.status}
+                        </span>
+                        <button
+                          onClick={() =>
+                            router.push(`/dashboard/${selectedSession.id}/inspect`)
+                          }
+                          className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-md hover:bg-purple-200 transition-colors"
+                        >
+                          Inspect Full Session Details
+                        </button>
+                      </div>
+                    </div>
+  
+                    <div className="mt-4">
+                      <StageProgressBar
+                        currentStage={selectedSession.current_stage}
+                        isCompleted={selectedSession.status === "COMPLETED"}
+                        turnCounts={turnCounts}
+                      />
+                    </div>
+  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Started</p>
+                      <p className="mt-1 text-gray-700">
+                        {new Date(selectedSession.started_at).toLocaleString([], { timeZone: "America/New_York" })}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Completed</p>
+                      <p className="mt-1 text-gray-700">
+                        {selectedSession.completed_at
+                          ? new Date(selectedSession.completed_at).toLocaleString([], { timeZone: "America/New_York" })
+                          : "Still active"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Messages</p>
+                      <p className="mt-1 text-gray-700">{messages.length}</p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Latest Student Note</p>
+                      <p className="mt-1 text-gray-700 line-clamp-2">
+                        {latestStudentMessage?.content || "No student message yet"}
+                      </p>
+                    </div>
+                  </div>
+  
+                  </div>
+  
+                  <div className="w-full max-w-4xl space-y-4">
+                    {selectedSession.evaluation_data && (
+                      <JsonPanel title="Evaluation JSON" data={selectedSession.evaluation_data} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+  
+            {selectedSession && isLoadingMessages && (
+              <div className="text-center text-gray-400 mt-8">Loading messages...</div>
+            )}
+  
+            {selectedSession && !isLoadingMessages && messages.length === 0 && (
+              <div className="text-center text-gray-400 mt-8">
+                <p className="text-lg">
+                  {isAdmin ? "No messages in this session yet." : "Start the conversation!"}
+                </p>
+                {!isAdmin && (
+                  <p className="text-sm mt-1">Type a message below to begin reflecting.</p>
+                )}
+              </div>
+            )}
+  
+            {messages.map((msg, idx) => (
+              <MessageCard
+                key={msg.id}
+                message={msg}
+                stageInfo={stages[msg.stage_id] || null}
+                mode="compact"
+                showStageBadge={isAdmin}
+                showMetadata={isAdmin}
+                prevStageId={idx > 0 ? messages[idx - 1].stage_id : undefined}
+              />
+            ))}
+  
+            {isSending && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-sm px-4 py-2.5">
+                  <span className="inline-flex gap-1">
+                    <span className="animate-bounce">.</span>
+                    <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                    <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                  </span>
+                </div>
+              </div>
+            )}
+  
+            {/* Inline evaluation after session completes */}
+            {selectedSession?.status === "COMPLETED" && selectedSession.evaluation_data && (
+              <InlineEvaluation data={selectedSession.evaluation_data} />
+            )}
+  
+            <div ref={messagesEndRef} />
+          </div>
+  
+          {/* Input */}
+          <div className="bg-white border-t border-gray-200 p-4">
+            {isAdmin ? (
+              selectedStudentId && selectedSession ? (
+                <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
+                  <span>
+                    Admin review mode is read-only here. Open the full inspector for stage registry details, richer metadata, and deeper raw JSON views.
+                  </span>
+                  <button
+                    onClick={() => router.push(`/dashboard/${selectedSession.id}/inspect`)}
+                    className="rounded-md bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                  >
+                    Inspect Session
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center text-sm text-gray-500 py-2">
+                  Select a student to open their conversations, then choose a session to review.
+                </div>
+              )
+            ) : selectedSession?.status === "COMPLETED" ? (
+              <div className="text-center text-sm text-gray-500 py-2">
+                Session completed.{" "}
+                <button
+                  onClick={createNewSession}
+                  className="text-blue-600 hover:underline"
+                >
+                  Start a new session
+                </button>
+              </div>
+            ) : selectedSession ? (
+              <form onSubmit={sendMessage} className="flex gap-2">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Type your message..."
+                  disabled={isSending}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isSending}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Send
+                </button>
+              </form>
+            ) : null}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  /* ================================================================ */
+  /*  STUDENT VIEW — Design A: full-screen avatar + floating overlay   */
+  /* ================================================================ */
+  return (
+    <main className="flex h-screen bg-slate-950">
+      {/* Sidebar — collapsible, dark theme to match */}
+      <aside
+        className={`${
+          sidebarOpen ? "w-64" : "w-0"
+        } transition-all duration-200 bg-slate-900 border-r border-white/5 flex flex-col overflow-hidden`}
+      >
+        <div className="p-4 border-b border-white/5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+              Sessions
+            </h2>
+            <button
+              onClick={createNewSession}
+              className="text-xs bg-white/10 text-white/70 px-3 py-1.5 rounded-md hover:bg-white/20 transition-colors"
+            >
+              + New
+            </button>
           </div>
           {isAdmin && (
             <div className="space-y-2">
@@ -869,557 +1750,261 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-
-        {/* Session list */}
         <div className="flex-1 overflow-y-auto">
           {isLoadingSessions ? (
-            <div className="p-4 text-sm text-gray-400">Loading sessions...</div>
-          ) : isAdmin && filteredStudents.length === 0 ? (
-            <div className="p-4 text-sm text-gray-400">
-              No students match the current filters.
-            </div>
-          ) : !isAdmin && sessions.length === 0 ? (
-            <div className="p-4 text-sm text-gray-400">
-              No sessions yet. Create one!
-            </div>
+            <div className="p-4 text-sm text-white/30">Loading...</div>
+          ) : sessions.length === 0 ? (
+            <div className="p-4 text-sm text-white/30">No sessions yet.</div>
           ) : (
-            isAdmin
-              ? filteredStudents.map((student) => {
-                  const sessionsForStudent = (studentSessionsMap[student.id] || []).sort(
-                    (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-                  );
-                  const latestSession = sessionsForStudent[0];
-                  const activeCount = sessionsForStudent.filter((session) => session.status === "ACTIVE").length;
-                  const evaluatedCount = sessionsForStudent.filter(
-                    (session) => getSessionScore(session) !== null
-                  ).length;
-
-                  return (
-                    <button
-                      key={student.id}
-                      onClick={() => handleSelectStudent(student.id)}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                        selectedStudentId === student.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="truncate text-sm font-medium text-gray-900">
-                          {formatStudentLabel(student)}
-                        </span>
-                        <span className="text-[10px] text-gray-400">
-                          {sessionsForStudent.length} convo{sessionsForStudent.length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-xs text-gray-500">@{student.username}</p>
-                      <div className="mt-2 flex items-center justify-between text-[10px] text-gray-500">
-                        <span>{latestSession ? formatStageLabel(latestSession.current_stage) : "No sessions"}</span>
-                        <span>{activeCount > 0 ? `${activeCount} active` : `${evaluatedCount} evaluated`}</span>
-                      </div>
-                    </button>
-                  );
-                })
-              : sessions.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => selectSession(s)}
-                    className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                      selectedSession?.id === s.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
+            sessions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => { selectSession(s, false); setShowFullHistory(false); }}
+                className={`w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${
+                  selectedSession?.id === s.id ? "bg-white/10 border-l-2 border-l-indigo-400" : ""
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      s.status === "ACTIVE"
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : "bg-white/10 text-white/40"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          s.status === "ACTIVE"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {s.status === "ACTIVE" ? "Active" : "Done"}
-                      </span>
-                      <span className="text-[10px] text-gray-400">
-                        {new Date(s.started_at).toLocaleDateString([], { timeZone: "America/New_York" })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1 truncate">
-                      Started {new Date(s.started_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        timeZone: "America/New_York",
-                      })}
-                    </p>
-                  </button>
-                ))
+                    {s.status === "ACTIVE" ? "Active" : "Done"}
+                  </span>
+                  <span className="text-[10px] text-white/30">
+                    {new Date(s.started_at).toLocaleDateString([], { timeZone: "America/New_York" })}
+                  </span>
+                </div>
+                <p className="text-xs text-white/40 mt-1 truncate">
+                  {new Date(s.started_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "America/New_York",
+                  })}
+                </p>
+              </button>
+            ))
           )}
         </div>
-
-        {/* Sidebar footer */}
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3 border-t border-white/5">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 truncate">
+            <span className="text-xs text-white/40 truncate">
               {user.display_name || user.username}
-              {isAdmin && (
-                <span className="ml-1 text-[10px] text-purple-600 font-medium">
-                  ADMIN
-                </span>
-              )}
             </span>
-            <button
-              onClick={logout}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={logout} className="text-xs text-white/30 hover:text-white/60">
               Logout
             </button>
           </div>
         </div>
       </aside>
-      )}
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {!isAdmin && (
-                <button
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="text-gray-400 hover:text-gray-600 p-1"
-                >
-                  {sidebarOpen ? "\u2039" : "\u203A"}
-                </button>
-              )}
-              {isAdmin && selectedStudentId && (
-                <button
-                  onClick={returnToStudentDirectory}
-                  className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                >
-                  Back to Students
-                </button>
-              )}
-              <div>
-                {isAdmin ? (
-                  <>
-                    <h1 className="text-base font-semibold text-gray-900">
-                      {!selectedStudentId
-                        ? "Admin Dashboard"
-                        : formatStudentLabel(selectedStudent)}
-                    </h1>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {!selectedStudentId
-                        ? "Browse students and open a conversation to inspect details."
-                        : selectedSession
-                          ? `Session on ${selectedSessionDate} | ${selectedSession.status} | ${formatStageLabel(selectedSession.current_stage)}`
-                          : `@${selectedStudent?.username || "unknown"} | ${selectedStudentSessions.length} conversation${selectedStudentSessions.length !== 1 ? "s" : ""} | latest ${selectedStudentLatestDate || "N/A"}`}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h1 className="text-base font-semibold text-gray-900">
-                      Reflection Session
-                    </h1>
-                    {selectedSession && (
-                      <div className="mt-1">
-                        <StageProgressBar
-                          currentStage={selectedSession.current_stage}
-                          isCompleted={selectedSession.status === "COMPLETED"}
-                          turnCounts={turnCounts}
-                          compact
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-            {isAdmin && (
+      {/* Main area — avatar fills everything */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* Avatar background — fills the entire area */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-950">
+          <UnityAvatarPanel />
+        </div>
+
+        {/* Top bar — floating, minimal */}
+        <div className="relative z-10 flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-white/30 hover:text-white/60 text-lg p-1"
+          >
+            {sidebarOpen ? "\u2039" : "\u203A"}
+          </button>
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
               <button
-                onClick={logout}
-                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                onClick={() => setShowFullHistory(!showFullHistory)}
+                className="text-xs bg-white/10 text-white/60 px-3 py-1.5 rounded-full hover:bg-white/20 backdrop-blur-sm transition-colors"
               >
-                Logout
+                {showFullHistory ? "Back to avatar" : "View full chat"}
+              </button>
+            )}
+            {isDemoRunning ? (
+              <button
+                onClick={stopDemo}
+                className="text-xs bg-red-500/20 text-red-300 px-3 py-1.5 rounded-full hover:bg-red-500/30 backdrop-blur-sm transition-colors"
+              >
+                Stop Demo
+              </button>
+            ) : (
+              <button
+                onClick={startDemo}
+                className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1.5 rounded-full hover:bg-amber-500/30 backdrop-blur-sm transition-colors"
+              >
+                Demo
               </button>
             )}
           </div>
-        </header>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-messages">
-          {!isAdmin && <UnityAvatarPanel />}
-
-          {isAdmin && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-              <AdminMetricCard
-                label="Students With Sessions"
-                value={String(totalStudents)}
-              />
-              <AdminMetricCard
-                label="Completed Sessions"
-                value={String(completedSessions.length)}
-              />
-              <AdminMetricCard label="Completion Rate" value={completionRate} />
-              <AdminMetricCard
-                label="Average Evaluation"
-                value={averageScore === "N/A" ? averageScore : `${averageScore}/5`}
-              />
-            </div>
-          )}
-
-          {isAdmin && !selectedStudentId && (
-            <div className="space-y-6">
-              <div className="rounded-xl border border-gray-200 bg-white p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400">
-                      Student Directory
-                    </p>
-                    <h2 className="mt-1 text-xl font-semibold text-gray-900">
-                      All Students
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Select a student to open their conversation history, evaluations, and raw JSON.
-                    </p>
-                  </div>
-                  <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[320px]">
-                    <input
-                      type="text"
-                      value={adminSearch}
-                      onChange={(e) => setAdminSearch(e.target.value)}
-                      placeholder="Search student, username, or stage"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value as SessionStatusFilter)}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="ALL">All statuses</option>
-                      <option value="ACTIVE">Active only</option>
-                      <option value="COMPLETED">Completed only</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {filteredStudents.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
-                  No students match the current filters.
-                </div>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredStudents.map((student) => {
-                    const sessionsForStudent = (studentSessionsMap[student.id] || []).sort(
-                      (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-                    );
-                    const latestSession = sessionsForStudent[0];
-                    const activeCount = sessionsForStudent.filter((session) => session.status === "ACTIVE").length;
-                    const averageStudentScore =
-                      sessionsForStudent.filter((session) => getSessionScore(session) !== null).length > 0
-                        ? (
-                            sessionsForStudent.reduce(
-                              (sum, session) => sum + (getSessionScore(session) || 0),
-                              0
-                            ) /
-                            sessionsForStudent.filter((session) => getSessionScore(session) !== null).length
-                          ).toFixed(1)
-                        : null;
-
-                    return (
-                      <button
-                        key={student.id}
-                        onClick={() => handleSelectStudent(student.id)}
-                        className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-blue-300 hover:bg-blue-50"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-lg font-semibold text-gray-900">
-                              {formatStudentLabel(student)}
-                            </p>
-                            <p className="mt-1 text-sm text-gray-500">@{student.username}</p>
-                          </div>
-                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                            {sessionsForStudent.length} conversation{sessionsForStudent.length !== 1 ? "s" : ""}
-                          </span>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-lg bg-gray-50 p-3">
-                            <p className="text-[10px] uppercase tracking-wide text-gray-400">Current Focus</p>
-                            <p className="mt-1 text-gray-700">
-                              {latestSession ? formatStageLabel(latestSession.current_stage) : "No sessions"}
-                            </p>
-                          </div>
-                          <div className="rounded-lg bg-gray-50 p-3">
-                            <p className="text-[10px] uppercase tracking-wide text-gray-400">Status</p>
-                            <p className="mt-1 text-gray-700">
-                              {activeCount > 0 ? `${activeCount} active` : "No active sessions"}
-                            </p>
-                          </div>
-                          <div className="rounded-lg bg-gray-50 p-3">
-                            <p className="text-[10px] uppercase tracking-wide text-gray-400">Latest Session</p>
-                            <p className="mt-1 text-gray-700">
-                              {latestSession
-                                ? new Date(latestSession.started_at).toLocaleDateString([], {
-                                    timeZone: "America/New_York",
-                                  })
-                                : "N/A"}
-                            </p>
-                          </div>
-                          <div className="rounded-lg bg-gray-50 p-3">
-                            <p className="text-[10px] uppercase tracking-wide text-gray-400">Average Eval</p>
-                            <p className="mt-1 text-gray-700">
-                              {averageStudentScore ? `${averageStudentScore}/5` : "No eval yet"}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!selectedSession && !isAdmin && (
-            <div className="text-center text-gray-400 mt-16">
-              <p className="text-lg">
-                Select a session or create a new one
-              </p>
-            </div>
-          )}
-
-          {selectedSession && isAdmin && selectedStudentId && (
-            <div className="space-y-4 mb-6">
-              <p className="text-sm text-gray-500">
-                Viewing {selectedStudentSessions.length} conversation{selectedStudentSessions.length !== 1 ? "s" : ""} for {formatStudentLabel(selectedStudent)}.
-              </p>
-
-              {selectedStudentProfile && (
-                <StudentProfilePanel
-                  student={selectedStudent}
-                  profile={selectedStudentProfile}
-                  sourceSessionDate={selectedStudentProfileDate}
-                />
-              )}
-
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400">
-                      Conversations
-                    </p>
-                    <h2 className="mt-1 text-lg font-semibold text-gray-900">
-                      {formatStudentLabel(selectedStudent)}
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Select a conversation to inspect the full transcript and evaluation context.
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                    {selectedStudentSessions.length} conversation{selectedStudentSessions.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {selectedStudentSessions.map((session) => {
-                    const score = getSessionScore(session);
-                    return (
-                      <button
-                        key={session.id}
-                        onClick={() => selectSession(session, true)}
-                        className={`rounded-xl border p-4 text-left transition-colors ${
-                          selectedSession.id === session.id
-                            ? "border-blue-300 bg-blue-50"
-                            : "border-gray-200 bg-white hover:bg-gray-50"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                              session.status === "ACTIVE"
-                                ? "bg-green-100 text-green-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {session.status === "ACTIVE" ? "Active" : "Completed"}
-                          </span>
-                          <span className="text-[10px] text-gray-400">
-                            {new Date(session.started_at).toLocaleDateString([], {
-                              timeZone: "America/New_York",
-                            })}
-                          </span>
-                        </div>
-                        <p className="mt-3 text-sm font-medium text-gray-900">
-                          {formatStageLabel(session.current_stage)}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {session.model_name || "model unknown"} | {session.prompt_version || "prompt unknown"}
-                        </p>
-                        <div className="mt-3 flex items-center justify-between text-[10px] text-gray-500">
-                          <span>{session.id.slice(0, 8)}</span>
-                          <span>{score !== null ? `${score}/5 score` : "No evaluation yet"}</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="mx-auto flex max-w-6xl flex-col items-center gap-4">
-                <div className="w-full max-w-4xl rounded-xl border border-gray-200 bg-white p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-gray-400">
-                        Session Summary
-                      </p>
-                      <h2 className="mt-1 text-lg font-semibold text-gray-900">
-                        {formatStudentLabel(selectedStudent)}
-                      </h2>
-                      <p className="mt-1 text-sm text-gray-500">
-                        @{selectedStudent?.username || "unknown"} | {selectedSession.model_name || "model unknown"} | {selectedSession.prompt_version || "prompt unknown"}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          selectedSession.status === "COMPLETED"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-blue-100 text-blue-700"
-                        }`}
-                      >
-                        {selectedSession.status}
-                      </span>
-                      <button
-                        onClick={() =>
-                          router.push(`/dashboard/${selectedSession.id}/inspect`)
-                        }
-                        className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-md hover:bg-purple-200 transition-colors"
-                      >
-                        Inspect Full Session Details
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <StageProgressBar
-                      currentStage={selectedSession.current_stage}
-                      isCompleted={selectedSession.status === "COMPLETED"}
-                      turnCounts={turnCounts}
-                    />
-                  </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Started</p>
-                    <p className="mt-1 text-gray-700">
-                      {new Date(selectedSession.started_at).toLocaleString([], { timeZone: "America/New_York" })}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Completed</p>
-                    <p className="mt-1 text-gray-700">
-                      {selectedSession.completed_at
-                        ? new Date(selectedSession.completed_at).toLocaleString([], { timeZone: "America/New_York" })
-                        : "Still active"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Messages</p>
-                    <p className="mt-1 text-gray-700">{messages.length}</p>
-                  </div>
-                  <div className="rounded-lg bg-gray-50 p-3">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Latest Student Note</p>
-                    <p className="mt-1 text-gray-700 line-clamp-2">
-                      {latestStudentMessage?.content || "No student message yet"}
-                    </p>
-                  </div>
-                </div>
-
-                </div>
-
-                <div className="w-full max-w-4xl space-y-4">
-                  {selectedSession.evaluation_data && (
-                    <JsonPanel title="Evaluation JSON" data={selectedSession.evaluation_data} />
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {selectedSession && isLoadingMessages && (
-            <div className="text-center text-gray-400 mt-8">Loading messages...</div>
-          )}
-
-          {selectedSession && !isLoadingMessages && messages.length === 0 && (
-            <div className="text-center text-gray-400 mt-8">
-              <p className="text-lg">
-                {isAdmin ? "No messages in this session yet." : "Start the conversation!"}
-              </p>
-              {!isAdmin && (
-                <p className="text-sm mt-1">Type a message below to begin reflecting.</p>
-              )}
-            </div>
-          )}
-
-          {messages.map((msg, idx) => (
-            <MessageCard
-              key={msg.id}
-              message={msg}
-              stageInfo={stages[msg.stage_id] || null}
-              mode="compact"
-              showStageBadge={isAdmin}
-              showMetadata={isAdmin}
-              prevStageId={idx > 0 ? messages[idx - 1].stage_id : undefined}
-            />
-          ))}
-
-          {isSending && (
-            <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-sm px-4 py-2.5">
-                <span className="inline-flex gap-1">
-                  <span className="animate-bounce">.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Inline evaluation after session completes */}
-          {selectedSession?.status === "COMPLETED" && selectedSession.evaluation_data && (
-            <InlineEvaluation data={selectedSession.evaluation_data} />
-          )}
-
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="bg-white border-t border-gray-200 p-4">
-          {isAdmin ? (
-            selectedStudentId && selectedSession ? (
-              <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
-                <span>
-                  Admin review mode is read-only here. Open the full inspector for stage registry details, richer metadata, and deeper raw JSON views.
-                </span>
-                <button
-                  onClick={() => router.push(`/dashboard/${selectedSession.id}/inspect`)}
-                  className="rounded-md bg-gray-100 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-200"
-                >
-                  Inspect Session
-                </button>
-              </div>
-            ) : (
-              <div className="text-center text-sm text-gray-500 py-2">
-                Select a student to open their conversations, then choose a session to review.
-              </div>
-            )
-          ) : selectedSession?.status === "COMPLETED" ? (
-            <div className="text-center text-sm text-gray-500 py-2">
-              Session completed.{" "}
+        {/* Full history overlay (toggled) */}
+        {showFullHistory && (
+          <div className="absolute inset-0 z-30 flex flex-col bg-slate-950">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <h2 className="text-sm font-medium text-white/60">Full Conversation</h2>
               <button
-                onClick={createNewSession}
-                className="text-blue-600 hover:underline"
+                onClick={() => setShowFullHistory(false)}
+                className="text-xs bg-white/10 text-white/60 px-3 py-1.5 rounded-full hover:bg-white/20 transition-colors"
               >
+                Back to avatar
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-indigo-500/30 text-white/90 rounded-br-sm"
+                        : "bg-white/10 text-white/90 rounded-bl-sm"
+                    }`}
+                  >
+                    {msg.content}
+                    <div className="text-[10px] text-white/30 mt-1">
+                      {new Date(msg.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: "America/New_York",
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {selectedSession?.status === "COMPLETED" && selectedSession.evaluation_data && (
+                <InlineEvaluation data={selectedSession.evaluation_data} />
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+        )}
+
+        {/* Floating chat overlay — bottom of screen, over the avatar */}
+        {!showFullHistory && (
+          <div className="relative z-10 mt-auto">
+            <div className="pointer-events-none h-16 bg-gradient-to-b from-transparent to-slate-950/80" />
+
+            <div className="bg-slate-950/80 backdrop-blur-md px-4 pb-2">
+              {!selectedSession && (
+                <div className="text-center py-8">
+                  <p className="text-white/40">Select a session or create a new one</p>
+                </div>
+              )}
+
+              {selectedSession && isLoadingMessages && (
+                <div className="text-center py-4">
+                  <p className="text-white/30 text-sm">Loading...</p>
+                </div>
+              )}
+
+              {selectedSession && !isLoadingMessages && messages.length === 0 && (
+                <div className="text-center py-6">
+                  <div className="inline-flex items-center gap-2 text-white/40 text-sm">
+                    <span className="inline-flex gap-1">
+                      <span className="animate-bounce">.</span>
+                      <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                      <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {selectedSession && !isLoadingMessages && messages.length > 0 && (
+                <div ref={overlayScrollRef} className="max-h-[25vh] overflow-y-auto space-y-2.5 py-2 scrollbar-thin">
+                  {recentMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                          msg.role === "user"
+                            ? "bg-indigo-500/30 text-white/90 rounded-br-sm"
+                            : "bg-white/10 text-white/90 rounded-bl-sm"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+
+                  {isSending && (
+                    <div className="flex justify-start">
+                      <div className="bg-white/10 text-white/60 rounded-2xl rounded-bl-sm px-4 py-2.5">
+                        <span className="inline-flex gap-1 text-sm">
+                          <span className="animate-bounce">.</span>
+                          <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                          <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={overlayEndRef} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Input bar — always at bottom */}
+        <div className="relative z-10 bg-slate-950/90 backdrop-blur-md border-t border-white/5 px-4 py-3">
+          {isDemoRunning && selectedSession?.status !== "COMPLETED" ? (
+            <div className="space-y-2">
+              {demoStep >= 0 && demoStep < DEMO_MESSAGES.length && !isDemoTyping && !isSending && (
+                <div className="text-xs text-white/30 bg-white/5 rounded-lg px-3 py-2 max-h-16 overflow-y-auto">
+                  <span className="font-medium text-white/40">Next:</span>{" "}
+                  {DEMO_MESSAGES[demoStep].slice(0, 120)}
+                  {DEMO_MESSAGES[demoStep].length > 120 ? "..." : ""}
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={input}
+                  readOnly
+                  placeholder={
+                    isSending ? "Waiting for tutor..." :
+                    isDemoTyping ? "" :
+                    demoStep < 0 ? "Greeting sent, click Next..." :
+                    demoStep >= DEMO_MESSAGES.length ? "Demo complete" :
+                    "Click Next to send..."
+                  }
+                  className="flex-1 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-white placeholder-white/30 text-sm"
+                />
+                <button
+                  onClick={demoNext}
+                  disabled={isDemoTyping || isSending || demoStep < 0 || demoStep >= DEMO_MESSAGES.length}
+                  className="bg-amber-500 text-white pl-4 pr-3 py-2.5 rounded-full hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 text-sm font-medium"
+                >
+                  Next
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+                <span className="text-[10px] text-white/30 whitespace-nowrap">
+                  {demoStep >= 0 ? demoStep + 1 : 0}/{DEMO_MESSAGES.length}
+                </span>
+              </div>
+            </div>
+          ) : selectedSession?.status === "COMPLETED" ? (
+            <div className="text-center text-sm text-white/40 py-1">
+              Session completed.{" "}
+              <button onClick={createNewSession} className="text-indigo-400 hover:text-indigo-300">
                 Start a new session
               </button>
+              {isDemoRunning && (
+                <button onClick={stopDemo} className="text-white/30 hover:text-white/50 ml-3">
+                  End demo
+                </button>
+              )}
             </div>
           ) : selectedSession ? (
             <form onSubmit={sendMessage} className="flex gap-2">
@@ -1429,12 +2014,12 @@ export default function DashboardPage() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Type your message..."
                 disabled={isSending}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                className="flex-1 px-4 py-2.5 bg-white/10 border border-white/10 rounded-full text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 disabled:opacity-50 text-sm"
               />
               <button
                 type="submit"
                 disabled={!input.trim() || isSending}
-                className="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="bg-indigo-500 text-white px-6 py-2.5 rounded-full hover:bg-indigo-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium"
               >
                 Send
               </button>

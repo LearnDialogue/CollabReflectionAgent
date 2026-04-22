@@ -18,6 +18,7 @@ out/
 build/
 dist/
 *.egg-info/
+*.tsbuildinfo
 
 # IDE
 .idea/
@@ -45,3 +46,10 @@ logs/
 # Database
 *.db
 *.sqlite3
+
+# Unity WebGL build artifacts (too large for git, ~69MB)
+frontend/public/unity-avatar/Build/
+
+# Claude Code local docs (keep locally, never push)
+CLAUDE.md
+.claude/

@@ -18,7 +18,7 @@ from typing import Protocol, runtime_checkable
 from openai import AsyncOpenAI
 
 from app.core.config import settings
-from app.schemas.llm import LLMTurnResponse, RoutingSignal
+from app.schemas.llm import LLMTurnResponse, RoutingSignal, TutorGesture, TutorExpression
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +86,11 @@ def _build_fallback(stage_id: str) -> LLMResult:
     """Build a safe fallback response when the LLM fails entirely."""
     return LLMResult(
         response=LLMTurnResponse(
-            student_text=FALLBACK_RESPONSES.get(stage_id, DEFAULT_FALLBACK),
+            tutor_response=FALLBACK_RESPONSES.get(stage_id, DEFAULT_FALLBACK),
             stage_completed=False,
             routing_signal=RoutingSignal.STAY,
+            tutor_gesture=TutorGesture.IDLE,
+            tutor_expression=TutorExpression.NEUTRAL,
             reflection_data={"fallback": True, "reason": "llm_failure"},
         ),
         response_time_ms=0,

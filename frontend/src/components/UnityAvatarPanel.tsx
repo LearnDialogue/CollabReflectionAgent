@@ -31,6 +31,14 @@ declare global {
       sendExpression: (expression: string) => void;
       playNextGesture: () => void;
       playNextExpression: () => void;
+      sendCommand: (command: {
+        state?: string;
+        gesture?: string;
+        expression?: string;
+        text?: string;
+        speechText?: string;
+        displayInTranscript?: boolean;
+      }) => void;
     };
   }
 }
@@ -43,9 +51,9 @@ export default function UnityAvatarPanel() {
   const scriptRef = useRef<HTMLScriptElement | null>(null);
   const unityInstanceRef = useRef<{
     Quit?: () => Promise<void>;
+    SendMessage?: (gameObject: string, methodName: string, parameter?: string) => void;
   } | null>(null);
 
-  const [status, setStatus] = useState("Loading avatar...");
   const [progress, setProgress] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -76,6 +84,12 @@ export default function UnityAvatarPanel() {
             loaderScript.onerror = () => reject(new Error("Failed to load Unity loader."));
             document.body.appendChild(loaderScript);
           });
+        } else if (!window.createUnityInstance) {
+          // Script tag exists but hasn't finished loading yet (e.g. React strict mode remount)
+          await new Promise<void>((resolve, reject) => {
+            loaderScript.addEventListener("load", () => resolve(), { once: true });
+            loaderScript.addEventListener("error", () => reject(new Error("Failed to load Unity loader.")), { once: true });
+          });
         }
 
         if (!window.createUnityInstance) {
@@ -92,17 +106,15 @@ export default function UnityAvatarPanel() {
             productName: "Pedagogical Avatar",
             productVersion: "1.0",
             errorHandler: (message: string) => {
-              console.error("Unity runtime error:", message);
-              setHasError(true);
-              setErrorMessage(message);
-              setStatus("Avatar build could not be loaded.");
+              console.warn("Unity runtime error (non-fatal):", message);
+              // Don't show error overlay for WASM runtime errors — the avatar
+              // usually keeps running fine after these.
               return true;
             },
             startupErrorHandler: (message: string) => {
               console.error("Unity startup error:", message);
               setHasError(true);
               setErrorMessage(message);
-              setStatus("Avatar build could not be loaded.");
             },
             showBanner: (message: string, type?: string) => {
               if (type === "error" || type === "warning") {
@@ -113,7 +125,6 @@ export default function UnityAvatarPanel() {
           (nextProgress) => {
             if (cancelled) return;
             setProgress(nextProgress);
-            setStatus(nextProgress < 1 ? "Loading avatar..." : "Avatar ready");
           }
         );
 
@@ -145,6 +156,13 @@ export default function UnityAvatarPanel() {
           playNextExpression: () => {
             instance.SendMessage?.("ChatLLM", "PlayNextExpression");
           },
+          sendCommand: (command) => {
+            instance.SendMessage?.(
+              "ChatLLM",
+              "ReceiveLlmCommandJson",
+              JSON.stringify(command)
+            );
+          },
         };
         setHasError(false);
         setErrorMessage("");
@@ -153,7 +171,6 @@ export default function UnityAvatarPanel() {
         if (!cancelled) {
           setHasError(true);
           setErrorMessage(error instanceof Error ? error.message : String(error));
-          setStatus("Avatar build could not be loaded.");
         }
       }
     };
@@ -169,59 +186,45 @@ export default function UnityAvatarPanel() {
   }, []);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">Pedagogical Avatar</h2>
+    <div className="absolute inset-0 overflow-hidden">
+      <canvas
+        ref={canvasRef}
+        id="unity-avatar-canvas"
+        tabIndex={0}
+        className="block w-full"
+        style={{
+          background: "transparent",
+          height: "200%",
+          transform: "translateY(-20%)",
+        }}
+      />
+
+      {/* Loading overlay */}
+      {progress < 1 && !hasError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-900/80 to-indigo-950/80 backdrop-blur-sm">
+          <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-white/70 transition-all duration-300"
+              style={{ width: `${Math.round(progress * 100)}%` }}
+            />
+          </div>
+          <p className="text-xs text-white/50">{Math.round(progress * 100)}%</p>
         </div>
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
-            hasError
-              ? "bg-red-100 text-red-700"
-              : progress >= 1
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-amber-100 text-amber-700"
-          }`}
-        >
-          {status}
-        </span>
-      </div>
+      )}
 
-      <div className="relative bg-slate-950">
-        <canvas
-          ref={canvasRef}
-          id="unity-avatar-canvas"
-          tabIndex={0}
-          className="block h-[320px] w-full bg-transparent md:h-[380px]"
-        />
-
-        {progress < 1 && !hasError && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/80 px-6 text-center">
-            <div className="h-2 w-full max-w-xs overflow-hidden rounded-full bg-slate-800">
-              <div
-                className="h-full rounded-full bg-cyan-400 transition-all"
-                style={{ width: `${Math.round(progress * 100)}%` }}
-              />
-            </div>
-            <p className="text-sm text-slate-200">{Math.round(progress * 100)}%</p>
+      {/* Error overlay */}
+      {hasError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/90 px-8 text-center">
+          <div className="max-w-sm space-y-2">
+            <p className="text-sm text-white/70">Could not load the avatar.</p>
+            {errorMessage && (
+              <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-white/5 p-3 text-left text-xs text-rose-300/80">
+                {errorMessage}
+              </pre>
+            )}
           </div>
-        )}
-
-        {hasError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/85 px-6 text-center">
-            <div className="max-w-md space-y-2">
-              <p className="text-sm text-slate-200">
-                The Unity build was found, but the browser could not start it.
-              </p>
-              {errorMessage && (
-                <pre className="whitespace-pre-wrap rounded border border-slate-700 bg-slate-900/80 p-3 text-left text-xs text-rose-200">
-                  {errorMessage}
-                </pre>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
+        </div>
+      )}
+    </div>
   );
 }
