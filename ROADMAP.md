@@ -148,3 +148,102 @@ See previous version of this file for full D2 task breakdown. All steps (API plu
 ---
 
 *D3 completed: 2026-06-08*
+
+---
+---
+
+# 🗺️ D4 ROADMAP — SRL/SSRL Theoretical Reframe
+
+> **Status**: ✅ COMPLETE  
+> **Started**: 2026-07-14  
+> **Completed**: 2026-07-14  
+> **Goal**: Reframe the agent from Kolb's Experiential Learning Theory (ELT) to Self-Regulated Learning (SRL; Winne & Hadwin, 1998) and Socially-Shared Regulated Learning (SSRL; Järvelä & Hadwin, 2013).  
+> **Model**: Llama 3.3 70B via UF Navigator  
+> **Constraint**: CPS framework retained as complementary behavioral observation layer. Infrastructure, FlowEngine architecture, and database schema unchanged.
+
+---
+
+## Theoretical Grounding
+
+| Framework | Source | Role in Design |
+|-----------|--------|----------------|
+| SRL | Winne & Hadwin (1998) | 4-phase model: Task Definition → Goal Setting & Planning → Strategy Enactment → Adaptation. Basis for stage structure. |
+| SSRL | Järvelä & Hadwin (2013) | Extends SRL to the group level. Distinguishes individual, co-, and shared regulation. Dual-lens evaluation. |
+| CPS | PISA 2015 / Stadler (2019) | Collaborative problem solving indicators. Retained as complementary behavioral layer. |
+| MetaTutor | Azevedo et al. (2022) | Adaptive prompts > static prompts. Multi-process scaffolding. Informed prompt design. |
+| SRL in Bio | Harris (2022) | Reflection prompt design. Explicit instruction of regulatory strategies. |
+| Agent CPS | Sun (2019, 2021) | CPS + SRL agent scaffolding integration. |
+| COPES | Winne & Hadwin (2008) | Conditions, Operations, Products, Evaluations, Standards. Informed metadata schema. |
+
+---
+
+## Phase 1 — Stage Redesign (SRL/SSRL Mapping) ✅
+
+| # | Task | File(s) | Status |
+|---|------|---------|--------|
+| 1.1 | Rewrite STAGE_REGISTRY — 6 SRL/SSRL-mapped stages | `backend/app/core/prompts.py` | ✅ |
+| 1.2 | Update STAGE_ORDER to new 6-stage sequence | same | ✅ |
+| 1.3 | Update StageProgressBar.tsx with new stage labels | `frontend/src/components/StageProgressBar.tsx` | ✅ |
+
+**New stages**: welcome → task_understanding → planning_reflection → strategy_monitoring → evaluate_adapt → wrap_up
+
+---
+
+## Phase 2 — Prompt Registry Rewrite ✅
+
+| # | Task | File(s) | Status |
+|---|------|---------|--------|
+| 2.1 | Rewrite SYSTEM_PREAMBLE — regulation focus, near-peer tone | `backend/app/core/prompts.py` | ✅ |
+| 2.2 | Update RESPONSE_FORMAT_INSTRUCTION — SRL-aware reflection_data | same | ✅ |
+| 2.3 | Rewrite SESSION_EVALUATION_PROMPT — SRL/SSRL assessment, regulatory growth | same | ✅ |
+| 2.4 | Update build_system_prompt() — CPS injection targets strategy_monitoring | same | ✅ |
+| 2.5 | Update build_cps_context() docstring | same | ✅ |
+
+---
+
+## Phase 3 — FlowEngine Updates ✅
+
+| # | Task | File(s) | Status |
+|---|------|---------|--------|
+| 3.1 | Move CPS injection from observe_dynamics to strategy_monitoring | `backend/app/services/flow_engine.py` | ✅ |
+| 3.2 | Rewrite _signal_detected() with new signal patterns | same | ✅ |
+| 3.3 | Enhance _load_cross_session_context() with regulatory growth tracking | same | ✅ |
+| 3.4 | Update docstrings and comments for SRL/SSRL | same | ✅ |
+
+**New signals**: described_task, described_planning, described_monitoring, evaluated_outcome, proposed_adaptation, mentioned_teammate
+
+---
+
+## Phase 4 — Documentation ✅
+
+| # | Task | File(s) | Status |
+|---|------|---------|--------|
+| 4.1 | Update README.md — all ELT → SRL/SSRL references | `README.md` | ✅ |
+| 4.2 | Add D4 section to ROADMAP.md | `ROADMAP.md` | ✅ |
+| 4.3 | Update session_evaluator.py docstrings | `backend/app/services/session_evaluator.py` | ✅ |
+
+---
+
+## Files Changed in D4
+
+| File | Action | Phase |
+|------|--------|-------|
+| `backend/app/core/prompts.py` | **Rewritten** | 1, 2 |
+| `backend/app/services/flow_engine.py` | Modified | 3 |
+| `backend/app/services/session_evaluator.py` | Modified | 4 |
+| `frontend/src/components/StageProgressBar.tsx` | Modified | 1 |
+| `README.md` | Modified | 4 |
+| `ROADMAP.md` | Modified | 4 |
+
+## What Stayed the Same
+
+- CPS indicator framework (database, seed, admin API)
+- Infrastructure (Docker, PostgreSQL, Next.js, auth)
+- FlowEngine architecture (hybrid transitions, min/max turns, time limits)
+- LLM client (no API changes)
+- Database schema (no migrations needed)
+- LLM response schema (reflection_data remains a freeform dict)
+
+---
+
+*D4 completed: 2026-07-14*

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict, field_serializer
 
 from app.models.session import SessionStatus
@@ -28,7 +29,7 @@ class SessionRead(BaseModel):
     completed_at: datetime | None = None
     evaluation_data: Optional[dict] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     @field_serializer("started_at", "completed_at")
     def serialize_datetimes(self, value: datetime | None) -> str | None:

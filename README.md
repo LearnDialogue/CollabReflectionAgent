@@ -1,6 +1,6 @@
 # Collaborative Reflection Agent
 
-A conversational AI agent designed to guide high school robotics students through metacognitive reflection on their **teamwork experience**. Grounded in Kolb's Experiential Learning Theory (ELT) and the Collaborative Problem Solving (CPS) framework, the agent helps students recall team experiences, observe dynamics, make meaning, and plan experiments — all in a 10-minute session.
+A conversational AI agent designed to guide high school robotics students through metacognitive reflection on their **team's regulatory processes**. Grounded in Self-Regulated Learning (SRL; Winne & Hadwin, 1998) and Socially-Shared Regulated Learning (SSRL; Järvelä & Hadwin, 2013), with the Collaborative Problem Solving (CPS) framework as a complementary behavioral observation layer, the agent helps students reflect on how their team understood the task, planned, monitored progress, and adapted — all in a 10-minute session.
 
 ---
 
@@ -42,18 +42,18 @@ High school robotics students benefit from reflecting on their **teamwork**, but
 
 ### The Solution
 A chat-based AI agent that:
-- Guides students through a **6-stage ELT reflection protocol** focused on teamwork
+- Guides students through a **6-stage SRL/SSRL reflection protocol** focused on team regulation
 - Uses **Socratic questioning** with an acknowledge-and-pivot strategy for robot talk
-- Probes for **CPS framework** indicators during the observe_dynamics stage
-- Maintains **cross-session memory** via evaluation profiles (passive, student-initiated)
-- Produces **structured evaluations** with ELT quality assessment and CPS analysis
+- Probes for **CPS framework** indicators during the strategy_monitoring stage
+- Maintains **cross-session memory** with regulatory growth tracking (passive, student-initiated)
+- Produces **structured evaluations** with SRL quality assessment, SSRL analysis, and CPS classification
 - Enforces **10-minute time-bounded sessions** with graceful wrap-up
 
 ### Design Principles
 - **Near-peer tone**: Like a slightly older student, not a teacher or coach
-- **Teamwork-focused**: The robot is context; the team is the subject
+- **Regulation-focused**: The robot is context; how the team *regulates* their work is the subject
 - **Hybrid transitions**: LLM recommends, FlowEngine decides (deterministic guardrails)
-- **Research-friendly**: Full audit trail with transition decisions, CPS indicators, and ELT assessment
+- **Research-friendly**: Full audit trail with transition decisions, CPS indicators, SRL/SSRL assessment, and regulatory growth tracking
 - **Privacy-conscious**: Minimal data collection, clear boundaries
 
 ---
@@ -70,19 +70,19 @@ The core system is fully functional with LLM integration, a dashboard UI, and po
 | API | Complete | All CRUD endpoints for sessions, messages, users |
 | LLM Integration | Complete | Llama 3.3 70B via UF Navigator, JSON mode, retry logic, structured responses |
 | Dashboard UI | Complete | Session sidebar, chat, stage progress, metadata display |
-| Post-Session Eval | Complete | ELT assessment, student profiling, CPS analysis, recommendations |
+| Post-Session Eval | Complete | SRL assessment, SSRL analysis, student profiling, CPS classification, recommendations |
 | CPS Framework | Complete | Database-driven indicators, admin API, dynamic prompt injection |
 | Hybrid Transitions | Complete | Min/max turns, required signal heuristics, LLM override capability |
-| Cross-Session Memory | Complete | Passive memory from evaluation profiles, student-initiated only |
+| Cross-Session Memory | Complete | Passive memory from evaluation profiles with regulatory growth tracking |
 | Time-Bounded Sessions | Complete | 10-minute limit with graceful wrap-up at 70% threshold |
 | Safety Monitoring | Planned | Database table exists, detection logic not yet implemented |
 
 **What you can do right now:**
 1. Log in as admin or student
-2. Start a chat session and have a real conversation focused on teamwork
-3. Watch the agent progress through 6 ELT-mapped reflection stages
+2. Start a chat session and have a real conversation focused on team regulation
+3. Watch the agent progress through 6 SRL/SSRL-mapped reflection stages
 4. View hybrid transition decisions and CPS indicators in message metadata
-5. See a full evaluation with ELT quality assessment when the session completes
+5. See a full evaluation with SRL/SSRL quality assessment when the session completes
 6. Manage CPS indicators via the admin API
 7. Inspect any session with detailed metadata on the inspect page
 
@@ -310,7 +310,7 @@ AgenticRoboticsEvaluator/
 
 Located in `backend/app/services/flow_engine.py`. This orchestrates each turn of conversation with **hybrid transition logic**:
 
-1. Loads CPS indicators (for observe_dynamics) and cross-session memory
+1. Loads CPS indicators (for strategy_monitoring) and cross-session memory with regulatory growth data
 2. Checks time limits — force-jumps to wrap_up if over budget
 3. Builds a system prompt from the Prompt Registry using the current stage config
 4. Calls the LLM client to get a response
@@ -324,12 +324,12 @@ Located in `backend/app/services/flow_engine.py`. This orchestrates each turn of
 
 Located in `backend/app/core/prompts.py`. Single source of truth for all LLM instructions:
 
-- **SYSTEM_PREAMBLE**: Teamwork-focused near-peer persona for high school students
-- **RESPONSE_FORMAT_INSTRUCTION**: JSON contract with CPS-aware reflection_data
-- **STAGE_REGISTRY**: 6 ELT-mapped stages with min/max turns and required signals
-- **SESSION_EVALUATION_PROMPT**: ELT quality assessment + CPS complaint analysis
+- **SYSTEM_PREAMBLE**: Regulation-focused near-peer persona for high school students
+- **RESPONSE_FORMAT_INSTRUCTION**: JSON contract with CPS-aware and SRL-aware reflection_data
+- **STAGE_REGISTRY**: 6 SRL/SSRL-mapped stages with min/max turns and required signals
+- **SESSION_EVALUATION_PROMPT**: SRL quality assessment + SSRL analysis + CPS classification
 - **build_cps_context()**: Dynamic CPS indicator injection from database
-- **build_system_prompt()**: Assembles persona + stage + CPS + memory + format
+- **build_system_prompt()**: Assembles persona + stage + CPS + memory + regulatory growth + format
 
 ### LLM Client
 
@@ -345,21 +345,23 @@ Located in `backend/app/services/llm_client.py`. Wraps LLM API calls (via UF Nav
 Located in `backend/app/services/session_evaluator.py`. Runs one LLM call after a session completes to produce:
 
 - Overall quality score with justification
-- **ELT assessment**: Quality rating for each phase of Kolb's cycle
-- Student profile with teamwork patterns, communication style, and memory hooks
-- **CPS complaint analysis**: Maps student observations to CPS framework indicators
-- Tutor performance analysis (including teamwork focus and acknowledge-and-pivot quality)
+- **SRL assessment**: Quality rating for each phase of the regulatory cycle (task definition, planning, monitoring, adaptation)
+- **SSRL assessment**: Evidence of shared regulation at the group level vs. individual or co-regulation
+- Student profile with teamwork patterns, regulation tendencies, communication style, and memory hooks
+- **Regulatory growth tracking**: Cross-session assessment of metacognitive development with recommended focus areas
+- **CPS classification**: Maps student observations to CPS framework indicators
+- Tutor performance analysis (including regulation focus and acknowledge-and-pivot quality)
 - Recommendations for future sessions
 
-### The 6 Conversation Stages (ELT-Mapped)
+### The 6 Conversation Stages (SRL/SSRL-Mapped)
 
 ```
-1. welcome             — Build rapport, learn who they are
-2. recall_experience   — Concrete Experience: what happened in the team meeting
-3. observe_dynamics    — Reflective Observation: what team dynamics they noticed (+ CPS probing)
-4. make_meaning        — Abstract Conceptualization: why those dynamics occurred
-5. plan_experiment     — Active Experimentation: what they'll try differently next meeting
-6. wrap_up             — Summarize through ELT lens and close
+1. welcome                — Build rapport, orient to reflecting on team regulation
+2. task_understanding      — SRL Phase 1 (Task Definition) / SSRL: Shared Task Understanding
+3. planning_reflection     — SRL Phase 2 (Goal Setting & Planning) / SSRL: Shared Planning
+4. strategy_monitoring     — SRL Phase 3 (Strategy Enactment + Monitoring) / SSRL: Shared Monitoring (+ CPS probing)
+5. evaluate_adapt          — SRL Phase 4 (Evaluation & Adaptation) / SSRL: Shared Reflection
+6. wrap_up                 — Summarize through SRL/SSRL lens and close
 ```
 
 ### Authentication Flow

@@ -5,6 +5,12 @@ When a session completes, this service compiles the full conversation
 transcript with all per-turn metadata, sends it to the LLM with a
 strict evaluation prompt, and returns structured JSON analysis.
 
+The evaluation assesses the session through the lens of:
+  - SRL (Winne & Hadwin, 1998): Quality of each regulatory phase
+  - SSRL (Järvelä & Hadwin, 2013): Shared vs. individual regulation
+  - CPS (PISA 2015): Collaborative problem solving indicators
+  - Regulatory growth: Cross-session tracking of metacognitive development
+
 This is a separate call from the per-turn conversation. It runs once
 per completed session and uses the full context window.
 """
@@ -14,6 +20,7 @@ import logging
 import time
 from typing import Optional
 
+# pyrefly: ignore [missing-import]
 from openai import AsyncOpenAI
 
 from app.core.config import settings

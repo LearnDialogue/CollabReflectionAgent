@@ -10,7 +10,13 @@ commands. The engine applies deterministic guardrails:
   - min_turns: never advance before the minimum
   - max_turns: always advance after the maximum
   - required_signals: heuristic keyword checks on student messages
-  - time limits: force wrap-up if session exceeds time budget (Phase 6)
+  - time limits: force wrap-up if session exceeds time budget
+
+The conversation protocol is grounded in:
+  - SRL (Winne & Hadwin, 1998): Task Definition → Goal Setting & Planning →
+    Strategy Enactment → Adaptation
+  - SSRL (Järvelä & Hadwin, 2013): Extends SRL to the group level
+  - CPS (PISA 2015): Collaborative problem solving indicators (complementary)
 
 Every transition decision is logged with full audit data in llm_metadata.
 """
@@ -40,11 +46,11 @@ logger = logging.getLogger(__name__)
 
 class FlowEngine:
     """
-    Manages conversation flow through ELT-mapped stages.
+    Manages conversation flow through SRL/SSRL-mapped stages.
 
     Takes a session, its message history, the student, an LLM client,
     and optionally a database session (for CPS indicator lookup and
-    cross-session memory).
+    cross-session memory with regulatory growth tracking).
 
     process() calls the LLM and returns the response text, new stage,
     completion flag, and metadata to persist.
@@ -75,9 +81,11 @@ class FlowEngine:
         Returns:
             (response_text, new_stage, is_complete, llm_metadata)
         """
-        # Build CPS context for observe_dynamics stage
+        # Build CPS context for strategy_monitoring stage
+        # CPS indicators are most relevant during the monitoring/enactment
+        # phase, where students describe team interactions and coordination
         cps_context = None
-        if self.current_stage == "observe_dynamics" and self.db is not None:
+        if self.current_stage == "strategy_monitoring" and self.db is not None:
             cps_context = build_cps_context(self.db)
 
         # Load cross-session memory from previous evaluations
@@ -335,26 +343,51 @@ class FlowEngine:
             return False
 
         patterns: dict[str, list[str]] = {
-            "described_event": [
+            "described_task": [
                 "today", "yesterday", "meeting", "worked on", "happened",
                 "we did", "we tried", "session", "last time", "earlier",
                 "this week", "practice", "after school", "we were",
+                "the task", "the project", "our goal", "what we needed",
+                "supposed to", "had to", "needed to", "the assignment",
             ],
             "mentioned_teammate": [
                 "teammate", "team", "partner", "they ", "he ", "she ",
                 "we ", "us ", "our ", "my group", "my partner",
                 "everyone", "nobody", "someone", "the other",
             ],
-            "articulated_why": [
+            "described_planning": [
+                "plan", "planned", "decided", "assigned", "divided",
+                "split up", "organized", "set a goal", "agreed",
+                "figured out", "laid out", "started with", "first we",
+                "no plan", "didn't plan", "just started", "jumped in",
+                "winged it", "who does what", "roles", "in charge",
+            ],
+            "described_monitoring": [
+                "checked", "check in", "noticed", "realized",
+                "adjusted", "changed", "switched", "stopped",
+                "weren't working", "wasn't working", "went wrong",
+                "hit a wall", "stuck", "problem", "struggled",
+                "progress", "on track", "behind", "ahead",
+                "brought it up", "said something", "pointed out",
+                "regrouped", "pivot", "adapted", "fixed",
+                "didn't notice", "kept going", "pushed through",
+            ],
+            "evaluated_outcome": [
+                "worked", "didn't work", "was good", "was bad",
+                "effective", "helped", "made it worse", "improved",
                 "because", "realized", "i think", "reason", "probably",
                 "maybe it's", "i guess", "that's why", "i noticed",
                 "it makes sense", "i wonder if", "could be",
-                "i feel like", "it seemed like",
+                "next time", "should have", "could have",
+                "if we had", "looking back", "in hindsight",
             ],
-            "proposed_action": [
+            "proposed_adaptation": [
                 "i'll", "i will", "next time", "going to", "plan to",
                 "try to", "want to", "gonna", "next meeting",
                 "i could", "i should", "i might", "let me",
+                "check in", "regroup", "set a goal", "make a plan",
+                "ask everyone", "divide up", "assign", "organize",
+                "monitor", "stop and", "pause and", "step back",
             ],
         }
 
@@ -393,12 +426,13 @@ class FlowEngine:
                 "content": msg.content,
             })
 
-        # Add the current user message (not yet in DB history)
+        # Add the current user message (only if not already the last message in history)
         if current_input is not None:
-            messages.append({
-                "role": "user",
-                "content": current_input,
-            })
+            if not messages or messages[-1]["role"] != "user" or messages[-1]["content"] != current_input:
+                messages.append({
+                    "role": "user",
+                    "content": current_input,
+                })
 
         return messages
 
@@ -442,14 +476,17 @@ class FlowEngine:
             "approaching_limit": elapsed >= threshold,
         }
 
+
     def _load_cross_session_context(self) -> Optional[str]:
         """
         Load context from the student's most recent completed session.
 
         Queries the evaluation_data JSONB from the last completed session
-        and extracts the student_profile. This gives the agent awareness
-        of the student's previous teamwork patterns, communication style,
-        and memory hooks.
+        and extracts the student_profile, including regulatory growth data.
+        This gives the agent awareness of the student's previous teamwork
+        patterns, communication style, memory hooks, and — critically —
+        their regulatory tendencies and growth areas for progressive
+        scaffolding across sessions.
 
         Returns a formatted string for prompt injection, or None if no
         previous sessions exist or db is unavailable.
@@ -502,6 +539,9 @@ class FlowEngine:
         if profile.get("teamwork_patterns") and profile["teamwork_patterns"] != "N/A":
             lines.append(f"- Teamwork patterns: {profile['teamwork_patterns']}")
 
+        if profile.get("regulation_tendencies") and profile["regulation_tendencies"] != "N/A":
+            lines.append(f"- Regulation tendencies: {profile['regulation_tendencies']}")
+
         if profile.get("emotional_patterns") and profile["emotional_patterns"] != "N/A":
             lines.append(f"- Emotional patterns: {profile['emotional_patterns']}")
 
@@ -513,6 +553,53 @@ class FlowEngine:
         if unresolved and unresolved != ["N/A"]:
             lines.append(f"- Unresolved from last time: {'; '.join(unresolved)}")
 
+        # Regulatory growth tracking — enables progressive scaffolding
+        reg_growth = profile.get("regulatory_growth", {})
+        if reg_growth:
+            growth_lines = []
+            if reg_growth.get("current_awareness_level") and reg_growth["current_awareness_level"] != "N/A":
+                growth_lines.append(
+                    f"  Regulatory awareness: {reg_growth['current_awareness_level']}"
+                )
+            growth_areas = reg_growth.get("growth_areas", [])
+            if growth_areas and growth_areas != ["N/A"]:
+                growth_lines.append(
+                    f"  Areas for growth: {'; '.join(growth_areas)}"
+                )
+            strengths = reg_growth.get("strengths", [])
+            if strengths and strengths != ["N/A"]:
+                growth_lines.append(
+                    f"  Regulatory strengths: {'; '.join(strengths)}"
+                )
+            focus = reg_growth.get("recommended_focus_next_session")
+            if focus and focus != "N/A":
+                growth_lines.append(
+                    f"  Recommended focus this session: {focus}"
+                )
+            if growth_lines:
+                lines.append("- Regulatory growth (from last session's evaluation):")
+                lines.extend(growth_lines)
+
+        # Collaborative behavior tracking (CPS framework indicators) from previous session
+        cps_analysis = eval_data.get("cps_complaint_analysis", {})
+        if cps_analysis:
+            cps_lines = []
+            if cps_analysis.get("cps_summary") and cps_analysis["cps_summary"] != "N/A":
+                cps_lines.append(f"  Summary: {cps_analysis['cps_summary']}")
+            
+            complaints = cps_analysis.get("complaints", [])
+            if complaints:
+                for c in complaints:
+                    valence_str = "Breakdown" if c.get("valence") == "negative" else "Positive behavior"
+                    cps_lines.append(
+                        f"  - {valence_str} under facet '{c.get('facet')}' (Indicator: {c.get('indicator')}) "
+                        f"described as: \"{c.get('complaint_text')}\""
+                    )
+            
+            if cps_lines:
+                lines.append("- Collaborative dynamics (CPS framework) observed last time:")
+                lines.extend(cps_lines)
+
         # Only return if we actually have useful content (not just the header)
         if len(lines) <= 4:
             return None
@@ -521,8 +608,11 @@ class FlowEngine:
         lines.append(
             "IMPORTANT: Do NOT proactively bring up these details. Only "
             "reference them if the student mentions something related first. "
-            "If they say something that connects to a memory hook or "
-            "unresolved topic, you can naturally reference it."
+            "If they say something that connects to a memory hook, "
+            "unresolved topic, or regulatory growth area, you can naturally "
+            "reference it. For regulatory growth, gently steer toward the "
+            "recommended focus area when a natural opportunity arises — "
+            "but NEVER use academic language about 'regulation' or 'SRL'."
         )
 
         logger.debug(

@@ -4,7 +4,7 @@ CPS Indicator model — stores the Collaborative Problem Solving framework.
 Each row represents a single behavioral indicator from the CPS framework.
 Indicators are organized by facet → sub-facet → indicator and can be
 toggled on/off via is_active. The agent dynamically loads active indicators
-during the observe_dynamics stage.
+during the strategy_monitoring stage.
 
 Admins populate example_prompt (agent-facing question to probe this behavior)
 and literature_ref / literature_doi (academic citation supporting this indicator)
@@ -27,7 +27,7 @@ class CPSIndicator(Base):
     The CPS framework has 3 facets, each with sub-facets, each with
     specific observable indicators. These are used in two ways:
 
-    1. During live conversation (observe_dynamics stage): active indicators
+    1. During live conversation (strategy_monitoring stage): active indicators
        and their example_prompt fields are injected into the system prompt
        so the agent knows what teamwork behaviors to probe.
 

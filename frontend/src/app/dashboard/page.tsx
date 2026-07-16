@@ -228,12 +228,11 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
             <div className="p-2.5 bg-white rounded-lg border border-gray-100">
               <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Engagement Arc</h4>
               <p className="text-xs text-gray-700">{String(engagement.summary)}</p>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium mt-1 ${
-                engagement.trajectory === "rising" ? "bg-green-100 text-green-700" :
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium mt-1 ${engagement.trajectory === "rising" ? "bg-green-100 text-green-700" :
                 engagement.trajectory === "falling" ? "bg-red-100 text-red-700" :
-                engagement.trajectory === "steady" ? "bg-blue-100 text-blue-700" :
-                "bg-yellow-100 text-yellow-700"
-              }`}>
+                  engagement.trajectory === "steady" ? "bg-blue-100 text-blue-700" :
+                    "bg-yellow-100 text-yellow-700"
+                }`}>
                 {String(engagement.trajectory)}
               </span>
             </div>
@@ -265,9 +264,8 @@ function InlineEvaluation({ data }: { data: Record<string, unknown> }) {
                           <td className="px-2 py-1.5 text-gray-700">{c.sub_facet}</td>
                           <td className="px-2 py-1.5 text-gray-700">{c.indicator}</td>
                           <td className="px-2 py-1.5">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                              c.valence === "positive" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                            }`}>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${c.valence === "positive" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                              }`}>
                               {c.valence}
                             </span>
                           </td>
@@ -541,6 +539,7 @@ export default function DashboardPage() {
   const [stages, setStages] = useState<Record<string, StageInfo>>({});
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [optimisticUserMessage, setOptimisticUserMessage] = useState<string | null>(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -716,6 +715,7 @@ export default function DashboardPage() {
     const content = input.trim();
     setInput("");
     setIsSending(true);
+    setOptimisticUserMessage(content);
     sendAvatarUserMessage(content);
     sendAvatarState("thinking");
 
@@ -729,10 +729,10 @@ export default function DashboardPage() {
       setSelectedSession((prev) =>
         prev
           ? {
-              ...prev,
-              current_stage: response.current_stage,
-              status: response.session_status,
-            }
+            ...prev,
+            current_stage: response.current_stage,
+            status: response.session_status,
+          }
           : null
       );
       setSessions((prev) =>
@@ -776,6 +776,7 @@ export default function DashboardPage() {
       sendAvatarState("idle");
     } finally {
       setIsSending(false);
+      setOptimisticUserMessage(null);
     }
   };
 
@@ -866,6 +867,7 @@ export default function DashboardPage() {
     // Submit
     setInput("");
     setIsSending(true);
+    setOptimisticUserMessage(msg);
     sendAvatarUserMessage(msg);
     sendAvatarState("thinking");
 
@@ -879,10 +881,10 @@ export default function DashboardPage() {
       setSelectedSession((prev) =>
         prev
           ? {
-              ...prev,
-              current_stage: response.current_stage,
-              status: response.session_status,
-            }
+            ...prev,
+            current_stage: response.current_stage,
+            status: response.session_status,
+          }
           : null
       );
       setSessions((prev) =>
@@ -914,7 +916,7 @@ export default function DashboardPage() {
           setSessions((prev) =>
             prev.map((s) => (s.id === updated.id ? updated : s))
           );
-        } catch (_) {}
+        } catch (_) { }
         setDemoStep(-1);
         setIsDemoRunning(false);
       } else {
@@ -926,6 +928,7 @@ export default function DashboardPage() {
     } finally {
       setIsSending(false);
       setIsDemoTyping(false);
+      setOptimisticUserMessage(null);
     }
   };
 
@@ -964,18 +967,18 @@ export default function DashboardPage() {
   const filteredStudents =
     user?.role === "admin"
       ? students.filter((student) => {
-          const query = adminSearch.trim().toLowerCase();
-          const sessionsForStudent = studentSessionsMap[student.id] || [];
-          if (sessionsForStudent.length === 0) return false;
-          if (query.length === 0) return true;
-          return (
-            formatStudentLabel(student).toLowerCase().includes(query) ||
-            student.username.toLowerCase().includes(query) ||
-            sessionsForStudent.some((session) =>
-              formatStageLabel(session.current_stage).toLowerCase().includes(query)
-            )
-          );
-        })
+        const query = adminSearch.trim().toLowerCase();
+        const sessionsForStudent = studentSessionsMap[student.id] || [];
+        if (sessionsForStudent.length === 0) return false;
+        if (query.length === 0) return true;
+        return (
+          formatStudentLabel(student).toLowerCase().includes(query) ||
+          student.username.toLowerCase().includes(query) ||
+          sessionsForStudent.some((session) =>
+            formatStageLabel(session.current_stage).toLowerCase().includes(query)
+          )
+        );
+      })
       : students;
 
   const selectedStudent =
@@ -985,8 +988,8 @@ export default function DashboardPage() {
   const selectedStudentSessions =
     user?.role === "admin" && selectedStudentId
       ? (studentSessionsMap[selectedStudentId] || []).sort(
-          (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
-        )
+        (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+      )
       : [];
 
   const completedSessions = sessions.filter((session) => session.status === "COMPLETED");
@@ -995,11 +998,11 @@ export default function DashboardPage() {
   const averageScore =
     evaluatedSessions.length > 0
       ? (
-          evaluatedSessions.reduce(
-            (sum, session) => sum + (getSessionScore(session) || 0),
-            0
-          ) / evaluatedSessions.length
-        ).toFixed(1)
+        evaluatedSessions.reduce(
+          (sum, session) => sum + (getSessionScore(session) || 0),
+          0
+        ) / evaluatedSessions.length
+      ).toFixed(1)
       : "N/A";
   const completionRate =
     sessions.length > 0
@@ -1011,13 +1014,13 @@ export default function DashboardPage() {
   const latestSelectedStudentSession = selectedStudentSessions[0] || null;
   const selectedStudentLatestDate = latestSelectedStudentSession
     ? new Date(latestSelectedStudentSession.started_at).toLocaleDateString([], {
-        timeZone: "America/New_York",
-      })
+      timeZone: "America/New_York",
+    })
     : null;
   const selectedSessionDate = selectedSession
     ? new Date(selectedSession.started_at).toLocaleDateString([], {
-        timeZone: "America/New_York",
-      })
+      timeZone: "America/New_York",
+    })
     : null;
   const latestProfileSession =
     selectedStudentSessions.find(
@@ -1028,12 +1031,12 @@ export default function DashboardPage() {
     ) || null;
   const selectedStudentProfile = latestProfileSession
     ? ((latestProfileSession.evaluation_data as Record<string, unknown>).student_profile as
-        Record<string, unknown>)
+      Record<string, unknown>)
     : null;
   const selectedStudentProfileDate = latestProfileSession
     ? new Date(latestProfileSession.started_at).toLocaleDateString([], {
-        timeZone: "America/New_York",
-      })
+      timeZone: "America/New_York",
+    })
     : null;
 
   const handleSelectStudent = async (studentId: string) => {
@@ -1070,8 +1073,9 @@ export default function DashboardPage() {
   const isAdmin = user.role === "admin";
 
   // Last few messages for the overlay (student view)
-  const recentMessages = messages.slice(-6);
+  const recentMessages = messages.slice(-15);
   const latestAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const latestMessage = messages[messages.length - 1] || null;
 
   /* ================================================================ */
   /*  ADMIN VIEW — traditional chat layout (unchanged behavior)        */
@@ -1081,70 +1085,69 @@ export default function DashboardPage() {
       <main className="flex h-screen bg-gray-50">
         {/* Sidebar */}
         {!isAdmin && (
-        <aside
-          className={`${
-            sidebarOpen ? "w-72" : "w-0"
-          } transition-all duration-200 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}
-        >
-          {/* Sidebar header */}
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                  {isAdmin ? "Students" : "Sessions"}
-                </h2>
-                {isAdmin && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Pick a student to review their conversations and evaluation data.
-                  </p>
+          <aside
+            className={`${sidebarOpen ? "w-72" : "w-0"
+              } transition-all duration-200 bg-white border-r border-gray-200 flex flex-col overflow-hidden`}
+          >
+            {/* Sidebar header */}
+            <div className="p-4 border-b border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                    {isAdmin ? "Students" : "Sessions"}
+                  </h2>
+                  {isAdmin && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Pick a student to review their conversations and evaluation data.
+                    </p>
+                  )}
+                </div>
+                {!isAdmin && (
+                  <button
+                    onClick={createNewSession}
+                    className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    + New
+                  </button>
                 )}
               </div>
-              {!isAdmin && (
-                <button
-                  onClick={createNewSession}
-                  className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  + New
-                </button>
+              {isAdmin && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={adminSearch}
+                    onChange={(e) => setAdminSearch(e.target.value)}
+                    placeholder="Search student, username, or stage"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as SessionStatusFilter)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="ALL">All statuses</option>
+                    <option value="ACTIVE">Active only</option>
+                    <option value="COMPLETED">Completed only</option>
+                  </select>
+                </div>
               )}
             </div>
-            {isAdmin && (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={adminSearch}
-                  onChange={(e) => setAdminSearch(e.target.value)}
-                  placeholder="Search student, username, or stage"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as SessionStatusFilter)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="ALL">All statuses</option>
-                  <option value="ACTIVE">Active only</option>
-                  <option value="COMPLETED">Completed only</option>
-                </select>
-              </div>
-            )}
-          </div>
-  
-          {/* Session list */}
-          <div className="flex-1 overflow-y-auto">
-            {isLoadingSessions ? (
-              <div className="p-4 text-sm text-gray-400">Loading sessions...</div>
-            ) : isAdmin && filteredStudents.length === 0 ? (
-              <div className="p-4 text-sm text-gray-400">
-                No students match the current filters.
-              </div>
-            ) : !isAdmin && sessions.length === 0 ? (
-              <div className="p-4 text-sm text-gray-400">
-                No sessions yet. Create one!
-              </div>
-            ) : (
-              isAdmin
-                ? filteredStudents.map((student) => {
+
+            {/* Session list */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoadingSessions ? (
+                <div className="p-4 text-sm text-gray-400">Loading sessions...</div>
+              ) : isAdmin && filteredStudents.length === 0 ? (
+                <div className="p-4 text-sm text-gray-400">
+                  No students match the current filters.
+                </div>
+              ) : !isAdmin && sessions.length === 0 ? (
+                <div className="p-4 text-sm text-gray-400">
+                  No sessions yet. Create one!
+                </div>
+              ) : (
+                isAdmin
+                  ? filteredStudents.map((student) => {
                     const sessionsForStudent = (studentSessionsMap[student.id] || []).sort(
                       (a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
                     );
@@ -1153,14 +1156,13 @@ export default function DashboardPage() {
                     const evaluatedCount = sessionsForStudent.filter(
                       (session) => getSessionScore(session) !== null
                     ).length;
-  
+
                     return (
                       <button
                         key={student.id}
                         onClick={() => handleSelectStudent(student.id)}
-                        className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                          selectedStudentId === student.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
-                        }`}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${selectedStudentId === student.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="truncate text-sm font-medium text-gray-900">
@@ -1178,21 +1180,19 @@ export default function DashboardPage() {
                       </button>
                     );
                   })
-                : sessions.map((s) => (
+                  : sessions.map((s) => (
                     <button
                       key={s.id}
                       onClick={() => selectSession(s)}
-                      className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                        selectedSession?.id === s.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
-                      }`}
+                      className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${selectedSession?.id === s.id ? "bg-blue-50 border-l-2 border-l-blue-500" : ""
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <span
-                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            s.status === "ACTIVE"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${s.status === "ACTIVE"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
+                            }`}
                         >
                           {s.status === "ACTIVE" ? "Active" : "Done"}
                         </span>
@@ -1209,31 +1209,31 @@ export default function DashboardPage() {
                       </p>
                     </button>
                   ))
-            )}
-          </div>
-  
-          {/* Sidebar footer */}
-          <div className="p-3 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500 truncate">
-                {user.display_name || user.username}
-                {isAdmin && (
-                  <span className="ml-1 text-[10px] text-purple-600 font-medium">
-                    ADMIN
-                  </span>
-                )}
-              </span>
-              <button
-                onClick={logout}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
-                Logout
-              </button>
+              )}
             </div>
-          </div>
-        </aside>
+
+            {/* Sidebar footer */}
+            <div className="p-3 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500 truncate">
+                  {user.display_name || user.username}
+                  {isAdmin && (
+                    <span className="ml-1 text-[10px] text-purple-600 font-medium">
+                      ADMIN
+                    </span>
+                  )}
+                </span>
+                <button
+                  onClick={logout}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+          </aside>
         )}
-  
+
         {/* Main chat area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
@@ -1301,11 +1301,11 @@ export default function DashboardPage() {
               )}
             </div>
           </header>
-  
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-messages">
             {!isAdmin && <UnityAvatarPanel />}
-  
+
             {isAdmin && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <AdminMetricCard
@@ -1323,7 +1323,7 @@ export default function DashboardPage() {
                 />
               </div>
             )}
-  
+
             {isAdmin && !selectedStudentId && (
               <div className="space-y-6">
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
@@ -1359,7 +1359,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
-  
+
                 {filteredStudents.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
                     No students match the current filters.
@@ -1375,14 +1375,14 @@ export default function DashboardPage() {
                       const averageStudentScore =
                         sessionsForStudent.filter((session) => getSessionScore(session) !== null).length > 0
                           ? (
-                              sessionsForStudent.reduce(
-                                (sum, session) => sum + (getSessionScore(session) || 0),
-                                0
-                              ) /
-                              sessionsForStudent.filter((session) => getSessionScore(session) !== null).length
-                            ).toFixed(1)
+                            sessionsForStudent.reduce(
+                              (sum, session) => sum + (getSessionScore(session) || 0),
+                              0
+                            ) /
+                            sessionsForStudent.filter((session) => getSessionScore(session) !== null).length
+                          ).toFixed(1)
                           : null;
-  
+
                       return (
                         <button
                           key={student.id}
@@ -1400,7 +1400,7 @@ export default function DashboardPage() {
                               {sessionsForStudent.length} conversation{sessionsForStudent.length !== 1 ? "s" : ""}
                             </span>
                           </div>
-  
+
                           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                             <div className="rounded-lg bg-gray-50 p-3">
                               <p className="text-[10px] uppercase tracking-wide text-gray-400">Current Focus</p>
@@ -1419,8 +1419,8 @@ export default function DashboardPage() {
                               <p className="mt-1 text-gray-700">
                                 {latestSession
                                   ? new Date(latestSession.started_at).toLocaleDateString([], {
-                                      timeZone: "America/New_York",
-                                    })
+                                    timeZone: "America/New_York",
+                                  })
                                   : "N/A"}
                               </p>
                             </div>
@@ -1438,7 +1438,7 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
-  
+
             {!selectedSession && !isAdmin && (
               <div className="text-center text-gray-400 mt-16">
                 <p className="text-lg">
@@ -1446,13 +1446,13 @@ export default function DashboardPage() {
                 </p>
               </div>
             )}
-  
+
             {selectedSession && isAdmin && selectedStudentId && (
               <div className="space-y-4 mb-6">
                 <p className="text-sm text-gray-500">
                   Viewing {selectedStudentSessions.length} conversation{selectedStudentSessions.length !== 1 ? "s" : ""} for {formatStudentLabel(selectedStudent)}.
                 </p>
-  
+
                 {selectedStudentProfile && (
                   <StudentProfilePanel
                     student={selectedStudent}
@@ -1460,7 +1460,7 @@ export default function DashboardPage() {
                     sourceSessionDate={selectedStudentProfileDate}
                   />
                 )}
-  
+
                 <div className="rounded-xl border border-gray-200 bg-white p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -1485,19 +1485,17 @@ export default function DashboardPage() {
                         <button
                           key={session.id}
                           onClick={() => selectSession(session, true)}
-                          className={`rounded-xl border p-4 text-left transition-colors ${
-                            selectedSession.id === session.id
-                              ? "border-blue-300 bg-blue-50"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
+                          className={`rounded-xl border p-4 text-left transition-colors ${selectedSession.id === session.id
+                            ? "border-blue-300 bg-blue-50"
+                            : "border-gray-200 bg-white hover:bg-gray-50"
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span
-                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                                session.status === "ACTIVE"
-                                  ? "bg-green-100 text-green-700"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
+                              className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${session.status === "ACTIVE"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-600"
+                                }`}
                             >
                               {session.status === "ACTIVE" ? "Active" : "Completed"}
                             </span>
@@ -1522,7 +1520,7 @@ export default function DashboardPage() {
                     })}
                   </div>
                 </div>
-  
+
                 <div className="mx-auto flex max-w-6xl flex-col items-center gap-4">
                   <div className="w-full max-w-4xl rounded-xl border border-gray-200 bg-white p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -1539,11 +1537,10 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            selectedSession.status === "COMPLETED"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${selectedSession.status === "COMPLETED"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                            }`}
                         >
                           {selectedSession.status}
                         </span>
@@ -1557,7 +1554,7 @@ export default function DashboardPage() {
                         </button>
                       </div>
                     </div>
-  
+
                     <div className="mt-4">
                       <StageProgressBar
                         currentStage={selectedSession.current_stage}
@@ -1565,36 +1562,36 @@ export default function DashboardPage() {
                         turnCounts={turnCounts}
                       />
                     </div>
-  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Started</p>
-                      <p className="mt-1 text-gray-700">
-                        {new Date(selectedSession.started_at).toLocaleString([], { timeZone: "America/New_York" })}
-                      </p>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
+                      <div className="rounded-lg bg-gray-50 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Started</p>
+                        <p className="mt-1 text-gray-700">
+                          {new Date(selectedSession.started_at).toLocaleString([], { timeZone: "America/New_York" })}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Completed</p>
+                        <p className="mt-1 text-gray-700">
+                          {selectedSession.completed_at
+                            ? new Date(selectedSession.completed_at).toLocaleString([], { timeZone: "America/New_York" })
+                            : "Still active"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Messages</p>
+                        <p className="mt-1 text-gray-700">{messages.length}</p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 p-3">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Latest Student Note</p>
+                        <p className="mt-1 text-gray-700 line-clamp-2">
+                          {latestStudentMessage?.content || "No student message yet"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Completed</p>
-                      <p className="mt-1 text-gray-700">
-                        {selectedSession.completed_at
-                          ? new Date(selectedSession.completed_at).toLocaleString([], { timeZone: "America/New_York" })
-                          : "Still active"}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Messages</p>
-                      <p className="mt-1 text-gray-700">{messages.length}</p>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-gray-400">Latest Student Note</p>
-                      <p className="mt-1 text-gray-700 line-clamp-2">
-                        {latestStudentMessage?.content || "No student message yet"}
-                      </p>
-                    </div>
+
                   </div>
-  
-                  </div>
-  
+
                   <div className="w-full max-w-4xl space-y-4">
                     {selectedSession.evaluation_data && (
                       <JsonPanel title="Evaluation JSON" data={selectedSession.evaluation_data} />
@@ -1603,11 +1600,11 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
-  
+
             {selectedSession && isLoadingMessages && (
               <div className="text-center text-gray-400 mt-8">Loading messages...</div>
             )}
-  
+
             {selectedSession && !isLoadingMessages && messages.length === 0 && (
               <div className="text-center text-gray-400 mt-8">
                 <p className="text-lg">
@@ -1618,7 +1615,7 @@ export default function DashboardPage() {
                 )}
               </div>
             )}
-  
+
             {messages.map((msg, idx) => (
               <MessageCard
                 key={msg.id}
@@ -1630,7 +1627,7 @@ export default function DashboardPage() {
                 prevStageId={idx > 0 ? messages[idx - 1].stage_id : undefined}
               />
             ))}
-  
+
             {isSending && (
               <div className="flex justify-start">
                 <div className="bg-gray-100 text-gray-900 rounded-2xl rounded-bl-sm px-4 py-2.5">
@@ -1642,15 +1639,15 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
-  
+
             {/* Inline evaluation after session completes */}
             {selectedSession?.status === "COMPLETED" && selectedSession.evaluation_data && (
               <InlineEvaluation data={selectedSession.evaluation_data} />
             )}
-  
+
             <div ref={messagesEndRef} />
           </div>
-  
+
           {/* Input */}
           <div className="bg-white border-t border-gray-200 p-4">
             {isAdmin ? (
@@ -1713,9 +1710,8 @@ export default function DashboardPage() {
     <main className="flex h-screen bg-slate-950">
       {/* Sidebar — collapsible, dark theme to match */}
       <aside
-        className={`${
-          sidebarOpen ? "w-64" : "w-0"
-        } transition-all duration-200 bg-slate-900 border-r border-white/5 flex flex-col overflow-hidden`}
+        className={`${sidebarOpen ? "w-64" : "w-0"
+          } transition-all duration-200 bg-slate-900 border-r border-white/5 flex flex-col overflow-hidden`}
       >
         <div className="p-4 border-b border-white/5">
           <div className="flex items-center justify-between">
@@ -1760,17 +1756,15 @@ export default function DashboardPage() {
               <button
                 key={s.id}
                 onClick={() => { selectSession(s, false); setShowFullHistory(false); }}
-                className={`w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${
-                  selectedSession?.id === s.id ? "bg-white/10 border-l-2 border-l-indigo-400" : ""
-                }`}
+                className={`w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors ${selectedSession?.id === s.id ? "bg-white/10 border-l-2 border-l-indigo-400" : ""
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                      s.status === "ACTIVE"
-                        ? "bg-emerald-500/20 text-emerald-300"
-                        : "bg-white/10 text-white/40"
-                    }`}
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${s.status === "ACTIVE"
+                      ? "bg-emerald-500/20 text-emerald-300"
+                      : "bg-white/10 text-white/40"
+                      }`}
                   >
                     {s.status === "ACTIVE" ? "Active" : "Done"}
                   </span>
@@ -1804,7 +1798,7 @@ export default function DashboardPage() {
       {/* Main area — avatar fills everything */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Avatar background — fills the entire area */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-indigo-950/50 to-slate-950">
+        <div className="absolute inset-0 bg-slate-950">
           <UnityAvatarPanel />
         </div>
 
@@ -1844,188 +1838,192 @@ export default function DashboardPage() {
         </div>
 
         {/* Full history overlay (toggled) */}
-        {showFullHistory && (
-          <div className="absolute inset-0 z-30 flex flex-col bg-slate-950">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-              <h2 className="text-sm font-medium text-white/60">Full Conversation</h2>
-              <button
-                onClick={() => setShowFullHistory(false)}
-                className="text-xs bg-white/10 text-white/60 px-3 py-1.5 rounded-full hover:bg-white/20 transition-colors"
-              >
-                Back to avatar
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-indigo-500/30 text-white/90 rounded-br-sm"
-                        : "bg-white/10 text-white/90 rounded-bl-sm"
-                    }`}
+          {showFullHistory && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 md:p-8">
+              <div className="bg-slate-900/95 border border-white/10 w-full max-w-2xl h-[70vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+                {/* Popup Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-950/40">
+                  <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Conversation Log</h2>
+                  <button
+                    onClick={() => setShowFullHistory(false)}
+                    className="text-xs bg-white/5 border border-white/10 text-white/70 px-4 py-1.5 rounded-full hover:bg-white/10 transition-colors"
                   >
-                    {msg.content}
-                    <div className="text-[10px] text-white/30 mt-1">
-                      {new Date(msg.created_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        timeZone: "America/New_York",
-                      })}
-                    </div>
-                  </div>
+                    Close Log
+                  </button>
                 </div>
-              ))}
-              {selectedSession?.status === "COMPLETED" && selectedSession.evaluation_data && (
-                <InlineEvaluation data={selectedSession.evaluation_data} />
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-        )}
 
-        {/* Floating chat overlay — bottom of screen, over the avatar */}
-        {!showFullHistory && (
-          <div className="relative z-10 mt-auto">
-            <div className="pointer-events-none h-16 bg-gradient-to-b from-transparent to-slate-950/80" />
-
-            <div className="bg-slate-950/80 backdrop-blur-md px-4 pb-2">
-              {!selectedSession && (
-                <div className="text-center py-8">
-                  <p className="text-white/40">Select a session or create a new one</p>
-                </div>
-              )}
-
-              {selectedSession && isLoadingMessages && (
-                <div className="text-center py-4">
-                  <p className="text-white/30 text-sm">Loading...</p>
-                </div>
-              )}
-
-              {selectedSession && !isLoadingMessages && messages.length === 0 && (
-                <div className="text-center py-6">
-                  <div className="inline-flex items-center gap-2 text-white/40 text-sm">
-                    <span className="inline-flex gap-1">
-                      <span className="animate-bounce">.</span>
-                      <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
-                      <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {selectedSession && !isLoadingMessages && messages.length > 0 && (
-                <div ref={overlayScrollRef} className="max-h-[25vh] overflow-y-auto space-y-2.5 py-2 scrollbar-thin">
-                  {recentMessages.map((msg) => (
+                {/* Popup Messages list */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
+                  {messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                      className="border-l-2 border-indigo-500/20 pl-4 py-1"
                     >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                          msg.role === "user"
-                            ? "bg-indigo-500/30 text-white/90 rounded-br-sm"
-                            : "bg-white/10 text-white/90 rounded-bl-sm"
-                        }`}
-                      >
+                      {/* Speaker label */}
+                      <div className={`text-xs font-bold mb-1 ${msg.role === "user" ? "text-amber-400" : "text-indigo-400"}`}>
+                        {msg.role === "user" ? "You" : "Mentor"}
+                      </div>
+                      {/* Message content */}
+                      <div className="text-sm text-white/90 leading-relaxed">
                         {msg.content}
+                      </div>
+                      <div className="text-[10px] text-white/30 mt-1">
+                        {new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "America/New_York",
+                        })}
                       </div>
                     </div>
                   ))}
+                  {selectedSession?.status === "COMPLETED" && selectedSession.evaluation_data && (
+                    <div className="pt-4">
+                      <InlineEvaluation data={selectedSession.evaluation_data} />
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+            </div>
+          )}
 
-                  {isSending && (
-                    <div className="flex justify-start">
-                      <div className="bg-white/10 text-white/60 rounded-2xl rounded-bl-sm px-4 py-2.5">
-                        <span className="inline-flex gap-1 text-sm">
-                          <span className="animate-bounce">.</span>
-                          <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
-                          <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+          {/* Primary Dialog Box at the bottom */}
+          {!showFullHistory && selectedSession && (
+            <div className="relative z-10 mt-auto w-full max-w-4xl mx-auto px-4 pb-8">
+              <div className="relative bg-slate-950/90 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-md">
+                {/* Speaker Tag */}
+                <div className="absolute -top-3.5 left-6 bg-indigo-600 text-white text-[11px] font-bold px-4 py-1 rounded-full uppercase tracking-wider border border-white/10 shadow-lg">
+                  {(isSending && optimisticUserMessage) ? "You" : isSending ? "Mentor" : latestMessage?.role === "user" ? "You" : "Mentor"}
+                </div>
+
+                {/* Message Content Area */}
+                <div className="min-h-[80px] text-white text-base leading-relaxed mb-4 pt-1">
+                  {isLoadingMessages ? (
+                    <p className="text-white/40 italic">Loading messages...</p>
+                  ) : isSending ? (
+                    optimisticUserMessage ? (
+                      <div className="space-y-2">
+                        <p className="text-slate-100">{optimisticUserMessage}</p>
+                        <div className="flex gap-1 items-center text-xs text-white/40 italic">
+                          <span>Mentor is thinking</span>
+                          <span className="flex gap-0.5">
+                            <span className="animate-bounce">.</span>
+                            <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                            <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1.5 items-center">
+                        <span className="animate-bounce">.</span>
+                        <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                        <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                      </div>
+                    )
+                  ) : latestMessage ? (
+                    <p className="text-slate-100">{latestMessage.content}</p>
+                  ) : (
+                    <p className="text-white/40 italic">Start the conversation below...</p>
+                  )}
+                </div>
+
+                {/* Input Area / Actions */}
+                <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row items-center gap-4 justify-between">
+                  {/* Text input form or Demo controls */}
+                  {isDemoRunning && selectedSession?.status !== "COMPLETED" ? (
+                    <div className="flex-1 flex flex-col gap-2 w-full">
+                      {demoStep >= 0 && demoStep < DEMO_MESSAGES.length && !isDemoTyping && !isSending && (
+                        <div className="text-[10px] text-white/40 bg-white/5 rounded-lg px-3 py-1">
+                          <span className="font-bold text-amber-400">Next Demo Step:</span>{" "}
+                          {DEMO_MESSAGES[demoStep].slice(0, 80)}
+                          {DEMO_MESSAGES[demoStep].length > 80 ? "..." : ""}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 w-full">
+                        <input
+                          type="text"
+                          value={input}
+                          readOnly
+                          placeholder={
+                            isSending ? "Waiting for tutor..." :
+                              isDemoTyping ? "" :
+                                demoStep < 0 ? "Greeting sent, click Next..." :
+                                  demoStep >= DEMO_MESSAGES.length ? "Demo complete" :
+                                    "Click Next to send..."
+                          }
+                          className="flex-1 px-4 py-2 bg-amber-500/5 border border-amber-500/20 rounded-full text-white placeholder-white/30 text-sm focus:outline-none"
+                        />
+                        <button
+                          onClick={demoNext}
+                          disabled={isDemoTyping || isSending || demoStep < 0 || demoStep >= DEMO_MESSAGES.length}
+                          className="bg-amber-500 hover:bg-amber-400 text-white px-5 py-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-semibold flex items-center gap-1"
+                        >
+                          Next
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                          </svg>
+                        </button>
+                        <span className="text-[10px] text-white/40 hidden md:inline">
+                          {demoStep >= 0 ? demoStep + 1 : 0}/{DEMO_MESSAGES.length}
                         </span>
                       </div>
                     </div>
+                  ) : selectedSession.status === "COMPLETED" ? (
+                    <div className="text-sm text-white/50 flex-1">
+                      Session completed.{" "}
+                      <button onClick={createNewSession} className="text-indigo-400 hover:text-indigo-300 font-semibold underline">
+                        Start a new session
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={sendMessage} className="flex-1 flex gap-2 w-full">
+                      <span className="text-white/40 text-sm font-semibold self-center hidden sm:inline">You:</span>
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Type your response..."
+                        disabled={isSending}
+                        className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 text-sm"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!input.trim() || isSending}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-full disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-semibold"
+                      >
+                        Send
+                      </button>
+                    </form>
                   )}
-                  <div ref={overlayEndRef} />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* Input bar — always at bottom */}
-        <div className="relative z-10 bg-slate-950/90 backdrop-blur-md border-t border-white/5 px-4 py-3">
-          {isDemoRunning && selectedSession?.status !== "COMPLETED" ? (
-            <div className="space-y-2">
-              {demoStep >= 0 && demoStep < DEMO_MESSAGES.length && !isDemoTyping && !isSending && (
-                <div className="text-xs text-white/30 bg-white/5 rounded-lg px-3 py-2 max-h-16 overflow-y-auto">
-                  <span className="font-medium text-white/40">Next:</span>{" "}
-                  {DEMO_MESSAGES[demoStep].slice(0, 120)}
-                  {DEMO_MESSAGES[demoStep].length > 120 ? "..." : ""}
+                  {/* Control Buttons */}
+                  <div className="flex gap-2 self-end sm:self-center">
+                    <button
+                      onClick={() => setShowFullHistory(true)}
+                      className="text-xs bg-white/5 border border-white/10 text-white/70 px-4 py-2 rounded-full hover:bg-white/10 transition-colors"
+                    >
+                      Log (History)
+                    </button>
+                    {isDemoRunning ? (
+                      <button
+                        onClick={stopDemo}
+                        className="text-xs bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-full hover:bg-red-500/30 transition-colors"
+                      >
+                        Stop Demo
+                      </button>
+                    ) : (
+                      <button
+                        onClick={startDemo}
+                        className="text-xs bg-amber-500/20 border border-amber-500/30 text-amber-300 px-4 py-2 rounded-full hover:bg-amber-500/30 transition-colors"
+                      >
+                        Demo
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={input}
-                  readOnly
-                  placeholder={
-                    isSending ? "Waiting for tutor..." :
-                    isDemoTyping ? "" :
-                    demoStep < 0 ? "Greeting sent, click Next..." :
-                    demoStep >= DEMO_MESSAGES.length ? "Demo complete" :
-                    "Click Next to send..."
-                  }
-                  className="flex-1 px-4 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-white placeholder-white/30 text-sm"
-                />
-                <button
-                  onClick={demoNext}
-                  disabled={isDemoTyping || isSending || demoStep < 0 || demoStep >= DEMO_MESSAGES.length}
-                  className="bg-amber-500 text-white pl-4 pr-3 py-2.5 rounded-full hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 text-sm font-medium"
-                >
-                  Next
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                  </svg>
-                </button>
-                <span className="text-[10px] text-white/30 whitespace-nowrap">
-                  {demoStep >= 0 ? demoStep + 1 : 0}/{DEMO_MESSAGES.length}
-                </span>
               </div>
             </div>
-          ) : selectedSession?.status === "COMPLETED" ? (
-            <div className="text-center text-sm text-white/40 py-1">
-              Session completed.{" "}
-              <button onClick={createNewSession} className="text-indigo-400 hover:text-indigo-300">
-                Start a new session
-              </button>
-              {isDemoRunning && (
-                <button onClick={stopDemo} className="text-white/30 hover:text-white/50 ml-3">
-                  End demo
-                </button>
-              )}
-            </div>
-          ) : selectedSession ? (
-            <form onSubmit={sendMessage} className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
-                disabled={isSending}
-                className="flex-1 px-4 py-2.5 bg-white/10 border border-white/10 rounded-full text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 disabled:opacity-50 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isSending}
-                className="bg-indigo-500 text-white px-6 py-2.5 rounded-full hover:bg-indigo-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                Send
-              </button>
-            </form>
-          ) : null}
-        </div>
+          )}
       </div>
     </main>
   );

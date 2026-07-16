@@ -15,6 +15,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+# pyrefly: ignore [missing-import]
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -67,19 +68,18 @@ class LLMClient(Protocol):
         ...
 
 
-# Fallback templates (D1 responses, used when LLM is unavailable)
+# Fallback templates (used when LLM is unavailable)
 
 FALLBACK_RESPONSES = {
-    "greeting": "Hey! I'm here to help you reflect on your robotics project. What would you like to talk about today?",
-    "context_gathering": "Can you tell me more about what you're working on right now?",
-    "problem_exploration": "What challenges are you running into?",
-    "guided_reflection": "That's interesting — why do you think that might be happening?",
-    "solution_brainstorm": "What are some approaches you could try?",
-    "action_planning": "What's one concrete step you could take next?",
-    "wrap_up": "Thanks for this conversation! You've done some great thinking today.",
+    "welcome": "Hey! I'm here to help you reflect on how your team worked together in robotics. How did today's team meeting go?",
+    "task_understanding": "What was the team working on in today's meeting? Did everyone know what needed to get done?",
+    "planning_reflection": "How did the team decide who does what? Was there a plan, or did people just jump in?",
+    "strategy_monitoring": "Once the team started working, did anyone check in on how things were going? Was there a point where something wasn't working?",
+    "evaluate_adapt": "Looking back, what worked well about how the team organized today? What's one thing you could try differently next meeting?",
+    "wrap_up": "Thanks for reflecting on how your team works together! You've done some great thinking. I'll see you next time.",
 }
 
-DEFAULT_FALLBACK = "I'm here to help you reflect. Can you tell me more about what's on your mind?"
+DEFAULT_FALLBACK = "I'm here to help you reflect on how your team works together. Can you tell me more about how the team organized their work today?"
 
 
 def _build_fallback(stage_id: str) -> LLMResult:
