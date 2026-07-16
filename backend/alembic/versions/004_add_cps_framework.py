@@ -12,7 +12,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = '004'
@@ -24,7 +24,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         'cps_indicators',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', sa.Uuid(as_uuid=True), primary_key=True),
         sa.Column('facet', sa.String(100), nullable=False, index=True),
         sa.Column('sub_facet', sa.String(150), nullable=False),
         sa.Column('indicator', sa.Text(), nullable=False),

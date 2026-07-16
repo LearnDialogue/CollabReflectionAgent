@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    DATABASE_URL: str = "postgresql://evaluator:evaluator_dev@localhost:5433/evaluator"
+    DATABASE_URL: str = "sqlite:///./evaluator.db"
 
     # JWT Settings
     SECRET_KEY: str = "dev-secret-key-change-in-production"

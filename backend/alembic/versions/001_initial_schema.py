@@ -9,7 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = '001'
@@ -20,19 +20,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Create enum types
-    user_role = postgresql.ENUM('STUDENT', 'ADMIN', name='userrole', create_type=False)
+    user_role = sa.Enum('STUDENT', 'ADMIN', name='userrole', create_type=False)
     user_role.create(op.get_bind(), checkfirst=True)
     
-    session_status = postgresql.ENUM('ACTIVE', 'COMPLETED', name='sessionstatus', create_type=False)
+    session_status = sa.Enum('ACTIVE', 'COMPLETED', name='sessionstatus', create_type=False)
     session_status.create(op.get_bind(), checkfirst=True)
     
-    message_role = postgresql.ENUM('user', 'assistant', name='messagerole', create_type=False)
+    message_role = sa.Enum('user', 'assistant', name='messagerole', create_type=False)
     message_role.create(op.get_bind(), checkfirst=True)
 
     # Create students table
     op.create_table(
         'students',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', sa.Uuid(as_uuid=True), primary_key=True),
         sa.Column('username', sa.String(255), unique=True, nullable=False, index=True),
         sa.Column('password_hash', sa.String(255), nullable=False),
         sa.Column('role', user_role, nullable=False, server_default='STUDENT'),
@@ -45,8 +45,8 @@ def upgrade() -> None:
     # Create sessions table
     op.create_table(
         'sessions',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('student_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('students.id'), nullable=False),
+        sa.Column('id', sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column('student_id', sa.Uuid(as_uuid=True), sa.ForeignKey('students.id'), nullable=False),
         sa.Column('status', session_status, nullable=False, server_default='ACTIVE'),
         sa.Column('current_stage', sa.String(50), nullable=False, server_default='RECALL_EVENT'),
         sa.Column('prompt_version', sa.String(20), nullable=False, server_default='v1'),
@@ -59,8 +59,8 @@ def upgrade() -> None:
     # Create messages table
     op.create_table(
         'messages',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('session_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('sessions.id'), nullable=False),
+        sa.Column('id', sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column('session_id', sa.Uuid(as_uuid=True), sa.ForeignKey('sessions.id'), nullable=False),
         sa.Column('role', message_role, nullable=False),
         sa.Column('content', sa.Text(), nullable=False),
         sa.Column('stage_id', sa.String(50), nullable=False),
@@ -71,22 +71,22 @@ def upgrade() -> None:
     # Create session_summaries table
     op.create_table(
         'session_summaries',
-        sa.Column('session_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('sessions.id'), primary_key=True),
+        sa.Column('session_id', sa.Uuid(as_uuid=True), sa.ForeignKey('sessions.id'), primary_key=True),
         sa.Column('event_summary', sa.Text(), nullable=True),
         sa.Column('challenges', sa.Text(), nullable=True),
         sa.Column('strategies', sa.Text(), nullable=True),
         sa.Column('next_goal', sa.Text(), nullable=True),
-        sa.Column('share_plan_json', postgresql.JSONB(), nullable=True),
+        sa.Column('share_plan_json', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
 
     # Create safety_incidents table
     op.create_table(
         'safety_incidents',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('student_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('students.id'), nullable=False),
-        sa.Column('session_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('sessions.id'), nullable=True),
-        sa.Column('message_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('messages.id'), nullable=False),
+        sa.Column('id', sa.Uuid(as_uuid=True), primary_key=True),
+        sa.Column('student_id', sa.Uuid(as_uuid=True), sa.ForeignKey('students.id'), nullable=False),
+        sa.Column('session_id', sa.Uuid(as_uuid=True), sa.ForeignKey('sessions.id'), nullable=True),
+        sa.Column('message_id', sa.Uuid(as_uuid=True), sa.ForeignKey('messages.id'), nullable=False),
         sa.Column('category', sa.String(100), nullable=False),
         sa.Column('severity', sa.String(50), nullable=False),
         sa.Column('notified', sa.Boolean(), nullable=False, server_default='false'),

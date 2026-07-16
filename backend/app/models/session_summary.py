@@ -13,7 +13,7 @@ a migration. Their semantic interpretation has been updated to SRL phases.
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import JSON as JSONB, Uuid as UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
