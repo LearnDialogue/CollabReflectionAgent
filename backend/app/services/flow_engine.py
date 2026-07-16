@@ -81,15 +81,7 @@ class FlowEngine:
         Returns:
             (response_text, new_stage, is_complete, llm_metadata)
         """
-        # Build CPS context for strategy_monitoring stage
-        # CPS indicators are most relevant during the monitoring/enactment
-        # phase, where students describe team interactions and coordination
-        cps_context = None
-        if self.current_stage == "strategy_monitoring" and self.db is not None:
-            cps_context = build_cps_context(self.db)
-
-        # Load cross-session memory from previous evaluations
-        cross_session_context = self._load_cross_session_context()
+        import random
 
         # Detect first-ever session for this student
         is_first_session = False
@@ -104,6 +96,46 @@ class FlowEngine:
                 .count()
             )
             is_first_session = prior_count == 0
+
+        # If this is the very first turn of the session, bypass LLM entirely
+        if user_input is None and self.current_stage == "welcome" and self._count_stage_turns() == 0:
+            stage_config = STAGE_REGISTRY.get(self.current_stage, {})
+            
+            if is_first_session:
+                fsm_lines = stage_config.get("fsm_first_session_opening_lines", ["Hello!"])
+            else:
+                fsm_lines = stage_config.get("fsm_opening_lines", ["Hello!"])
+                
+            fsm_line = random.choice(fsm_lines)
+            
+            # Mock metadata for FSM-generated turn
+            llm_metadata = {
+                "routing_signal": RoutingSignal.STAY.value,
+                "stage_completed": False,
+                "tutor_gesture": "neutral",
+                "tutor_expression": "neutral",
+                "reflection_data": {"routing_reason": "FSM deterministic opening"},
+                "model": "FSM",
+                "prompt_version": "v2",
+                "forced_advance": False,
+                "transition_decision": {"engine_decided": "STAY", "reason": "First turn bypass"},
+                "time_info": self._check_time_limit(),
+                "response_time_ms": 0,
+                "token_usage": {"total": 0},
+                "attempt_number": 1,
+            }
+            return fsm_line, self.current_stage, False, llm_metadata
+        # Build CPS context for strategy_monitoring stage
+        # CPS indicators are most relevant during the monitoring/enactment
+        # phase, where students describe team interactions and coordination
+        cps_context = None
+        if self.current_stage == "strategy_monitoring" and self.db is not None:
+            cps_context = build_cps_context(self.db)
+
+        # Load cross-session memory from previous evaluations
+        cross_session_context = self._load_cross_session_context()
+
+
 
         # Check time limit — force jump to wrap_up if over budget
         time_info = self._check_time_limit()
@@ -183,6 +215,14 @@ class FlowEngine:
             next_stage = stage_config.get("next_stage")
             if next_stage:
                 new_stage = next_stage
+                
+                # FSM Injection: Append the next stage's hardcoded opening line
+                next_stage_config = STAGE_REGISTRY.get(new_stage, {})
+                fsm_lines = next_stage_config.get("fsm_opening_lines", [])
+                if fsm_lines:
+                    import random
+                    fsm_line = random.choice(fsm_lines)
+                    llm_response.tutor_response = f"{llm_response.tutor_response.strip()} {fsm_line}"
 
         # Session is complete when wrap_up stage is completed
         is_complete = (
