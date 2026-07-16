@@ -45,6 +45,24 @@ def create_session(
     return session
 
 
+@router.get("/latest", response_model=SessionRead | None)
+def get_latest_session(
+    db: DBSession,
+    current_user: CurrentUser,
+) -> ChatSession | None:
+    """
+    Return the student's most recent session (by started_at), or null if none exist.
+    Used by the frontend to decide whether to auto-create or auto-resume.
+    """
+    session = (
+        db.query(ChatSession)
+        .filter(ChatSession.student_id == current_user.id)
+        .order_by(ChatSession.started_at.desc())
+        .first()
+    )
+    return session
+
+
 @router.get("", response_model=SessionList)
 def list_my_sessions(
     db: DBSession,

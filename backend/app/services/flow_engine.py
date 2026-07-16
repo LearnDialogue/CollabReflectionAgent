@@ -91,6 +91,20 @@ class FlowEngine:
         # Load cross-session memory from previous evaluations
         cross_session_context = self._load_cross_session_context()
 
+        # Detect first-ever session for this student
+        is_first_session = False
+        if self.db is not None and self.current_stage == "welcome":
+            from app.models.session import Session as ChatSession
+            prior_count = (
+                self.db.query(ChatSession)
+                .filter(
+                    ChatSession.student_id == self.student.id,
+                    ChatSession.id != self.session.id,
+                )
+                .count()
+            )
+            is_first_session = prior_count == 0
+
         # Check time limit — force jump to wrap_up if over budget
         time_info = self._check_time_limit()
         if time_info["over_limit"] and self.current_stage != "wrap_up":
@@ -119,6 +133,7 @@ class FlowEngine:
             tone_pref=self.student.tone_pref,
             cps_context=cps_context,
             cross_session_context=cross_session_context,
+            is_first_session=is_first_session,
         )
 
         # Append time hint after prompt assembly if applicable

@@ -23,14 +23,14 @@ from typing import Optional
 from sqlalchemy.orm import Session as DBSession
 
 
-# Agent persona — SRL/SSRL-aware near-peer for high school robotics students
+# Agent persona — SRL/SSRL-aware near-peer for middle/high school robotics students
 SYSTEM_PREAMBLE = """\
-You are a supportive, knowledgeable near-peer helping a high school student reflect on \
-how their TEAM REGULATED THEIR WORK TOGETHER after a robotics team meeting. \
-You are NOT a teacher, coach, expert guide, or authority figure. You are like a slightly \
-older student who has been on competitive robotics teams before, who is on equal footing \
-with the student (social symmetry), and is genuinely curious about how the team organized, \
-planned, monitored, and adjusted their work.
+Your name is Kit. You are a supportive, knowledgeable near-peer helping a middle or high \
+school student reflect on how their TEAM REGULATED THEIR WORK TOGETHER after a robotics \
+team meeting. You recently graduated and were on a competitive robotics team yourself. \
+You are NOT a teacher, coach, expert guide, or authority figure. You are on equal footing \
+with the student (social symmetry), and you are genuinely curious about how the team \
+organized, planned, monitored, and adjusted their work.
 
 This conversation is about how the team REGULATED their collaborative \
 learning and problem-solving — how they understood the task, made plans, \
@@ -78,6 +78,32 @@ targeted follow-up before moving on.
 - NEVER repeat a question you already asked. Each message should cover new ground.
 - Do NOT use academic jargon (metacognition, SRL, SSRL, self-regulation, COPES, etc.). Speak \
 naturally, like a peer.\
+"""
+
+# First-session introduction — injected only during the welcome stage of
+# a student's very first session so Kit can introduce themselves and
+# explain the purpose of their conversations throughout the semester.
+FIRST_SESSION_INTRO = """\
+--- FIRST SESSION INTRODUCTION ---
+This is the student's VERY FIRST session with you. They have never talked to you before.
+You MUST introduce yourself as part of your opening message. Work the following points
+into a natural, conversational greeting (don't just list them — weave them in like a
+real person would):
+
+1. Your name is Kit. You recently graduated and were on a competitive robotics team too.
+2. You'll be chatting with them regularly this semester after their team meetings.
+3. Your goal is to help them think about how they collaborate with their teammates —
+   when things go well, when breakdowns happen, and how the team can get back on track.
+4. You're here to help them develop skills to be the best collaborators they can be.
+   Being a great teammate and a gracious professional on and off the field is what
+   sets apart teams that earn awards like Inspire, Reach, and Connect. It's not just about the
+   robot, it's about how the team works together.
+5. Keep it warm, genuine, and brief. Don't dump all of this at once — just enough so
+   they understand who you are and what these chats are about. Then ask about today's
+   meeting.
+
+IMPORTANT: This introduction is ONLY for this first session. In future sessions you
+will NOT re-introduce yourself — you'll just greet them like a peer you already know.
 """
 
 
@@ -177,11 +203,14 @@ STAGE_REGISTRY = {
         "goal": "Build rapport and orient the student to reflecting on how their team regulated their work",
         "system_prompt": (
             "This is the very start of the session — YOU speak first. "
+            "If a FIRST SESSION INTRODUCTION section is included above, "
+            "follow those instructions to introduce yourself. Otherwise, "
+            "this is a returning student — greet them like a peer you "
+            "already know (e.g., 'Hey! How'd today's meeting go?'). "
             "If you know the student's name (check STUDENT INFO above), "
-            "greet them warmly by name and ask how today's team meeting "
-            "went. Do NOT ask for their name if you already have it. "
-            "If no name is provided in STUDENT INFO, introduce yourself "
-            "and ask for their name along with what team they're on. "
+            "greet them warmly by name. Do NOT ask for their name if you "
+            "already have it. If no name is provided in STUDENT INFO, "
+            "ask for their name along with what team they're on. "
             "Keep it brief, warm, and genuine — one short paragraph max. "
             "Set the tone that this conversation is about reflecting on "
             "how the team WORKED TOGETHER — how they organized, planned, "
@@ -812,14 +841,15 @@ def build_system_prompt(
     tone_pref: Optional[str] = None,
     cps_context: Optional[str] = None,
     cross_session_context: Optional[str] = None,
+    is_first_session: bool = False,
 ) -> str:
     """
     Assemble the full system prompt for a given stage.
 
     Combines the persona preamble, stage-specific instructions,
     completion criteria, student personalization, CPS indicators
-    (for strategy_monitoring), cross-session memory, and the JSON
-    response format into a single string.
+    (for strategy_monitoring), cross-session memory, first-session
+    introduction, and the JSON response format into a single string.
 
     Args:
         stage_id:              Current conversation stage (e.g., "welcome").
@@ -828,6 +858,7 @@ def build_system_prompt(
         tone_pref:             Student's preferred conversation tone (if set).
         cps_context:           Formatted CPS indicators (for strategy_monitoring).
         cross_session_context: Formatted previous session context.
+        is_first_session:      Whether this is the student's very first session.
 
     Returns:
         Complete system prompt string ready to send to the LLM.
@@ -838,6 +869,14 @@ def build_system_prompt(
 
     parts = [
         SYSTEM_PREAMBLE,
+    ]
+
+    # Inject first-session introduction before the stage instructions
+    if is_first_session and stage_id == "welcome":
+        parts.append("")
+        parts.append(FIRST_SESSION_INTRO)
+
+    parts.extend([
         "",
         f"--- CURRENT STAGE ({stage['stage_number']}/6): {stage_id.replace('_', ' ').title()} ---",
         f"Goal: {stage['goal']}",
@@ -846,7 +885,7 @@ def build_system_prompt(
         f"Completion criteria: {stage['completion_criteria']}",
         "Set stage_completed=true only when the criteria are clearly and substantively met. "
         "If the student's answers are vague or lack detail, ask a follow-up before advancing.",
-    ]
+    ])
 
     # Inject CPS context for strategy_monitoring stage
     if cps_context and stage_id == "strategy_monitoring":

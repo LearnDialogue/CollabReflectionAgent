@@ -61,6 +61,10 @@ export const sessionsApi = {
     const response = await api.post("/sessions");
     return response.data;
   },
+  latest: async () => {
+    const response = await api.get("/sessions/latest");
+    return response.data;
+  },
   list: async (page = 1, pageSize = 20) => {
     const response = await api.get("/sessions", {
       params: { page, page_size: pageSize },
